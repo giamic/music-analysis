@@ -1,5 +1,8 @@
 """
 All the functions that we need in order to read the database in cross_era and obtain features.
+The idea today is to have a huge training file containing all chroma features and on the left column the ID.
+Then we could fish N consecutive lines from this file and keep them iff the ID is always the same (not to mix songs)
+We repeat this B times and we create our batch of training examples.
 """
 import numpy as np
 import tensorflow as tf
