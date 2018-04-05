@@ -7,7 +7,7 @@ IDEA FOR THE ALGORITHM:
   - train
 """
 
-import tensorflow as tf
+# import tensorflow as tf
+import numpy as np
 
-
-w1 = tf.Variable()
+# w1 = tf.Variable()
