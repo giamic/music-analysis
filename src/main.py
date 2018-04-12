@@ -7,7 +7,19 @@ IDEA FOR THE ALGORITHM:
   - train
 """
 
-# import tensorflow as tf
+import tensorflow as tf
 import numpy as np
 
-# w1 = tf.Variable()
+from data_loading import train_input_fn, test_input_fn
+from model import cnn_model_fn
+
+music_analysis = tf.estimator.Estimator(
+    model_fn=cnn_model_fn,
+    model_dir="../models/model2/",
+    )
+
+music_analysis.train(input_fn=train_input_fn, steps=2_000)
+
+music_analysis.evaluate(input_fn=test_input_fn)
+
+
