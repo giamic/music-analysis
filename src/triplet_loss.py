@@ -6,7 +6,7 @@
 import tensorflow as tf
 
 
-def _pairwise_distances(embeddings, squared=False):
+def pairwise_distances(embeddings, squared=False):
     """Compute the 2D matrix of distances between all the embeddings.
     Args:
         embeddings: tensor of shape (batch_size, embed_dim)
@@ -126,7 +126,7 @@ def batch_all_triplet_loss(labels, embeddings, margin, squared=False):
         triplet_loss: scalar tensor containing the triplet loss
     """
     # Get the pairwise distance matrix
-    pairwise_dist = _pairwise_distances(embeddings, squared=squared)
+    pairwise_dist = pairwise_distances(embeddings, squared=squared)
 
     # shape (batch_size, batch_size, 1)
     anchor_positive_dist = tf.expand_dims(pairwise_dist, 2)
@@ -175,7 +175,7 @@ def batch_hard_triplet_loss(labels, embeddings, margin, squared=False):
         triplet_loss: scalar tensor containing the triplet loss
     """
     # Get the pairwise distance matrix
-    pairwise_dist = _pairwise_distances(embeddings, squared=squared)
+    pairwise_dist = pairwise_distances(embeddings, squared=squared)
 
     # For each anchor, get the hardest positive
     # First, we need to get a mask for every valid positive (they should have same label)

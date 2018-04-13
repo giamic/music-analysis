@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from triplet_loss import batch_hard_triplet_loss
+from triplet_loss import batch_hard_triplet_loss, pairwise_distances
 
 
 def cnn_model_fn(features, labels, mode):
@@ -13,8 +13,7 @@ def cnn_model_fn(features, labels, mode):
     :return:
     """
     # Input Layer
-    # input_layer = tf.reshape(features["x"], [-1, 128, 12])
-    input_layer = tf.reshape(features["x"], [-1, 84, 12])
+    input_layer = tf.reshape(features["x"], [-1, 128, 12])
 
     # Convolutional Layer #1 and Pooling Layer #1
     conv1 = tf.layers.conv1d(
@@ -23,7 +22,7 @@ def cnn_model_fn(features, labels, mode):
         kernel_size=4,
         padding="same",
         activation=tf.nn.relu)
-    pool1 = tf.layers.max_pooling1d(inputs=conv1, pool_size=2, strides=2)  # size 42
+    pool1 = tf.layers.max_pooling1d(inputs=conv1, pool_size=2, strides=2)  # size 64
 
     # Convolutional Layer #2 and Pooling Layer #2
     conv2 = tf.layers.conv1d(
@@ -32,7 +31,7 @@ def cnn_model_fn(features, labels, mode):
         kernel_size=4,
         padding="same",
         activation=tf.nn.relu)
-    pool2 = tf.layers.max_pooling1d(inputs=conv2, pool_size=2, strides=2)  # size 21
+    pool2 = tf.layers.max_pooling1d(inputs=conv2, pool_size=2, strides=2)  # size 32
 
     # Convolutional Layer #3 and Pooling Layer #3
     conv3 = tf.layers.conv1d(
@@ -41,10 +40,10 @@ def cnn_model_fn(features, labels, mode):
         kernel_size=4,
         padding="same",
         activation=tf.nn.relu)
-    pool3 = tf.layers.max_pooling1d(inputs=conv3, pool_size=3, strides=3)  # size 7
+    pool3 = tf.layers.max_pooling1d(inputs=conv3, pool_size=2, strides=2)  # size 16
 
     # Dense Layer
-    pool3_flat = tf.reshape(pool3, [-1, 7*128])
+    pool3_flat = tf.reshape(pool3, [-1, 16*128])
     output = tf.layers.dense(inputs=pool3_flat, units=1024, activation=tf.nn.relu)
 
     # dropout = tf.layers.dropout(
@@ -68,6 +67,8 @@ def cnn_model_fn(features, labels, mode):
         return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
     # EVAL mode
+    distance_matrix = pairwise_distances(output)
+    tf.Print(distance_matrix)
     return tf.estimator.EstimatorSpec(mode=mode, loss=loss)
 
     # predictions = {

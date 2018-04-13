@@ -15,7 +15,7 @@ from model import cnn_model_fn
 
 music_analysis = tf.estimator.Estimator(
     model_fn=cnn_model_fn,
-    model_dir="../models/model2/",
+    model_dir="../models/model1/"
     )
 
 music_analysis.train(input_fn=train_input_fn, steps=2_000)

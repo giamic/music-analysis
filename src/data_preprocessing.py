@@ -8,13 +8,16 @@ We modify it in the following way:
      effectively multiplies the size of the dataset by N.
   4. We remove incomplete lines or lines that mix songs (the last N-1 lines from each song)
 """
+import os
 import re
 import logging
 from warnings import warn
 
 import numpy as np
 import pandas as pd
+
 logging.getLogger('__main__')
+logging.basicConfig(level="INFO")
 
 
 def create_datapoints_for_dnn(df, T):
@@ -34,8 +37,8 @@ def create_datapoints_for_dnn(df, T):
         for nl, ol in zip(new_labels, original_labels[2:]):
             # df.assign would use the name "nl" instead of what nl contains, so we build and unpack a dictionary
             res = res.assign(**{nl: nans})  # create a new column
-            res.iloc[:-n, res.columns.get_loc(nl)] = df.iloc[:, df.columns.get_loc(ol)].shift(-n)
-
+            # res.iloc[:-n, res.columns.get_loc(nl)] = df.iloc[:, df.columns.get_loc(ol)].shift(-n)
+            res.iloc[:-n, res.columns.get_loc(nl)] = df.iloc[n:, df.columns.get_loc(ol)].values  # this is maybe faster
     return res[: - (T - 1)]  # drop the last N-1 rows because time t+N-1 is not defined for them
 
 
@@ -57,7 +60,7 @@ def take_id(song_name):
     return np.NaN
 
 
-def preprocess(input_file_paths, output_folder, T):
+def preprocess(input_file_paths, output_folder, T, overwrite=False):
     """
     Transform the data from CrossEra database into data that is useful to us.
 
@@ -69,14 +72,19 @@ def preprocess(input_file_paths, output_folder, T):
     original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
                        'G_t', 'G#_t']
     for f in input_file_paths:
+
+        logging.info("Working on file {}".format(f))
         data = pd.read_csv(f, header=None, names=original_labels)
         data['songID'] = data['songID'].apply(take_id)  # take just the ID of the song
         data['songID'] = data['songID'].fillna(method='ffill')  # repeat the ID for all rows
         for s in set(data['songID']):
+            path_output = output_folder + 'by_song/chroma-nnls_' + s + '.csv'
+            if not overwrite and os.path.isfile(path_output):
+                logging.info("Output file {} already exists. Skipping songID {}".format(path_output, s))
+                continue
             logging.info("Working on songID {}".format(s))
             df = data.loc[data['songID'] == s]  # select one song at a time not to use too much memory
             df = create_datapoints_for_dnn(df, T)  # add the desired columns
-            path_output = output_folder + 'by_song/chroma-nnls_' + s + '.csv'
             df.to_csv(path_output, header=False, index=False)  # write the df in a file
     return
 
@@ -96,9 +104,27 @@ def create_file_paths(folder):
     return [folder + fn + ".csv" for fn in file_names]
 
 
+def create_test_file(folder, T):
+    folder_by_song = folder+'by_song/'
+    file_paths = [folder_by_song + fp for fp in os.listdir(folder_by_song)][0:5]  # take only five songs so far
+    original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t', 'G_t', 'G#_t']
+    labels = original_labels[0:2]
+    chromas = original_labels[2:]
+    labels = labels + [c + str(t) for t in range(T) for c in chromas]
+    df_test = pd.DataFrame(columns=labels)
+    for fp in file_paths:
+        df = pd.read_csv(fp, header=None, names=labels)
+        idx = np.random.randint(0, df.shape[0], 10)
+        df_test = pd.concat([df_test, df.iloc[idx]], ignore_index=True)
+    path_output = folder + 'test.csv'
+    df_test.to_csv(path_output, header=False, index=False)
+    return
+
+
 if __name__ == '__main__':
     folder = "../data/dataset_audiolabs_crossera/"
     T = 128  # how many successive steps we want to put in a single row
 
-    input_fp = create_file_paths(folder)
-    preprocess(input_fp, folder, T)
+    # input_fp = create_file_paths(folder)
+    # preprocess(input_fp, folder, T)
+    create_test_file(folder, T)
