@@ -12,7 +12,6 @@ DEFAULTS[0] = ['']
 
 
 def parse_csv(line):
-    print('Parsing')
     columns = tf.decode_csv(line, record_defaults=DEFAULTS)  # take a line at a time
     # columns = tf.reshape(columns, [-1, 85, 12])
     # features = dict(zip(COLUMNS, columns))  # create a dictionary out of the features
@@ -24,9 +23,13 @@ def parse_csv(line):
 
 def train_input_fn(folder="../data/dataset_audiolabs_crossera/by_song/", batch_size=128):
     """Generate an input function for the Estimator."""
-    data_file = [folder + fp for fp in os.listdir(folder)][0:3]  # take only three songs so far
+    # data_file = [folder + fp for fp in os.listdir(folder)][0:3]  # take only three songs so far
+    # to simplify, take only three songs (predefined)
+    file_paths = ["chroma-nnls_CrossEra-0861.csv", "chroma-nnls_CrossEra-1444.csv", "chroma-nnls_CrossEra-1516.csv"]
+    data_file = [folder + fp for fp in file_paths]  # take only three songs so far
 
     # Extract lines from input files using the Dataset API.
+    # input_string = tf.train.string_input_producer(data_file)
     dataset = tf.data.TextLineDataset(data_file)
 
     dataset = dataset.map(parse_csv)
@@ -48,8 +51,9 @@ def test_input_fn(data_file="../data/dataset_audiolabs_crossera/test.csv"):
         '%s not found.' % data_file)
 
     # Extract lines from input files using the Dataset API.
+    # the test.csv file contains 5 songs: the three selected for training + 2 more
     dataset = tf.data.TextLineDataset(data_file)
-
-    dataset = dataset.map(parse_csv, num_parallel_calls=3).shuffle(1_000_000).batch(1_000_000)
+    # It contains also just 50 examples
+    dataset = dataset.map(parse_csv, num_parallel_calls=3).shuffle(50).repeat().batch(50)
 
     return dataset.make_one_shot_iterator().get_next()  # this will create a tuple (features, labels)
