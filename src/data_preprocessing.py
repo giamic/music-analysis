@@ -20,7 +20,7 @@ logging.getLogger('__main__')
 logging.basicConfig(level="INFO")
 
 
-def create_datapoints_for_dnn(df, T):
+def _create_datapoints_for_dnn(df, T):
     """
     Here we take the data frame with chroma features at time t and create all features at times t+1, t+2, ..., t+N-1.
 
@@ -42,7 +42,7 @@ def create_datapoints_for_dnn(df, T):
     return res[: - (T - 1)]  # drop the last N-1 rows because time t+N-1 is not defined for them
 
 
-def take_id(song_name):
+def _take_id(song_name):
     """
     Retrieve the ID from the name of the song in the CrossEra dataset
 
@@ -60,36 +60,7 @@ def take_id(song_name):
     return np.NaN
 
 
-def preprocess(input_file_paths, output_folder, T, overwrite=False):
-    """
-    Transform the data from CrossEra database into data that is useful to us.
-
-    :param input_file_paths: a list of the path to all input files
-    :param output_folder: where to store the csv we generate
-    :param T: the number of time steps to keep
-    :return:
-    """
-    original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
-                       'G_t', 'G#_t']
-    for f in input_file_paths:
-
-        logging.info("Working on file {}".format(f))
-        data = pd.read_csv(f, header=None, names=original_labels)
-        data['songID'] = data['songID'].apply(take_id)  # take just the ID of the song
-        data['songID'] = data['songID'].fillna(method='ffill')  # repeat the ID for all rows
-        for s in set(data['songID']):
-            path_output = output_folder + 'by_song/chroma-nnls_' + s + '.csv'
-            if not overwrite and os.path.isfile(path_output):
-                logging.info("Output file {} already exists. Skipping songID {}".format(path_output, s))
-                continue
-            logging.info("Working on songID {}".format(s))
-            df = data.loc[data['songID'] == s]  # select one song at a time not to use too much memory
-            df = create_datapoints_for_dnn(df, T)  # add the desired columns
-            df.to_csv(path_output, header=False, index=False)  # write the df in a file
-    return
-
-
-def create_file_paths(folder):
+def _create_file_paths(folder):
     """
     Given the folder, create the file paths to link to the CrossEra database
     :param folder:
@@ -104,27 +75,70 @@ def create_file_paths(folder):
     return [folder + fn + ".csv" for fn in file_names]
 
 
-def create_test_file(folder, T):
-    folder_by_song = folder+'by_song/'
-    file_paths = [folder_by_song + fp for fp in os.listdir(folder_by_song)][0:5]  # take only five songs so far
-    original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t', 'G_t', 'G#_t']
+def preprocess(input_folder, output_folder, T, overwrite=False):
+    """
+    Transform the data from CrossEra database into data that is useful to us.
+
+    :param input_file_paths: a list of the path to all input files
+    :param output_folder: where to store the csv we generate
+    :param T: the number of time steps to keep
+    :return:
+    """
+    original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
+                       'G_t', 'G#_t']
+    input_file_paths = _create_file_paths(input_folder)
+    for f in input_file_paths:
+
+        logging.info("Working on file {}".format(f))
+        data = pd.read_csv(f, header=None, names=original_labels)
+        data['songID'] = data['songID'].apply(_take_id)  # take just the ID of the song
+        data['songID'] = data['songID'].fillna(method='ffill')  # repeat the ID for all rows
+        for s in set(data['songID']):
+            path_output = output_folder + 'chroma-nnls_' + s + '.csv'
+            if not overwrite and os.path.isfile(path_output):
+                logging.info("Output file {} already exists. Skipping songID {}".format(path_output, s))
+                continue
+            logging.info("Working on songID {}".format(s))
+            df = data.loc[data['songID'] == s]  # select one song at a time not to use too much memory
+            df = _create_datapoints_for_dnn(df, T)  # add the desired columns
+            df.to_csv(path_output, header=False, index=False)  # write the df in a file
+    return
+
+
+def create_random_dataset(data_folder, path_output, steps, n_excerpts, n_songs=None):
+    """
+    Create a file containing a dataset with random picks from the different songs.
+
+    :param data_folder: where the data is stored per song
+    :param path_output: where to store the test data
+    :param steps: the number of time steps per row
+    :param n_excerpts: the number of rows we take from each song
+    :param n_songs: the number of songs we consider; if None, take all
+    :return:
+    """
+    if n_songs is None:
+        file_paths = [data_folder + fp for fp in os.listdir(data_folder)]  # take all the songs
+    else:  # take only n_songs so far
+        file_paths = np.random.choice([data_folder + fp for fp in os.listdir(data_folder)], n_songs, replace=False)
+    original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
+                       'G_t', 'G#_t']
     labels = original_labels[0:2]
     chromas = original_labels[2:]
-    labels = labels + [c + str(t) for t in range(T) for c in chromas]
-    df_test = pd.DataFrame(columns=labels)
+    labels = labels + [c + str(s) for s in range(steps) for c in chromas]
+    df_random = pd.DataFrame(columns=labels)
     for fp in file_paths:
         df = pd.read_csv(fp, header=None, names=labels)
-        idx = np.random.randint(0, df.shape[0], 10)
-        df_test = pd.concat([df_test, df.iloc[idx]], ignore_index=True)
-    path_output = folder + 'test.csv'
-    df_test.to_csv(path_output, header=False, index=False)
+        df_random = pd.concat([df_random, df.sample(n_excerpts)], ignore_index=True)
+    df_random = df_random.sample(frac=1)  # shuffle the df_random
+    df_random.to_csv(path_output, header=False, index=False)
     return
 
 
 if __name__ == '__main__':
-    folder = "../data/dataset_audiolabs_crossera/"
+    general_folder = "../data/dataset_audiolabs_crossera/"
+    by_song_folder = "/media/gianluca/data/PycharmProjects/music-analysis/data/dataset_audiolabs_crossera/by_song/"
     T = 128  # how many successive steps we want to put in a single row
 
-    # input_fp = create_file_paths(folder)
-    # preprocess(input_fp, folder, T)
-    create_test_file(folder, T)
+    # preprocess(general_folder, by_song_folder, T)
+    create_random_dataset(by_song_folder, general_folder + 'train.csv', T, 50)
+    create_random_dataset(by_song_folder, general_folder + 'test.csv', T, 10, 10)

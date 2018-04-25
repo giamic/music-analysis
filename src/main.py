@@ -13,8 +13,13 @@ import tensorflow as tf
 from data_loading import train_input_fn, test_input_fn
 from triplet_loss import batch_hard_triplet_loss, pairwise_distances
 
-train_input, train_targets = train_input_fn()
-test_input, test_targets = test_input_fn()
+train_folder = "/media/gianluca/data/PycharmProjects/music-analysis/data/dataset_audiolabs_crossera/by_song/"
+train_file = "../data/dataset_audiolabs_crossera/train.csv"
+test_file = "../data/dataset_audiolabs_crossera/test.csv"
+
+# train_input, train_targets = train_input_fn(train_folder)
+train_input, train_targets = train_input_fn(train_file)
+test_input, test_targets = test_input_fn(test_file)
 
 time = tf.placeholder(tf.float32, shape=None)  # access it with features["time"]
 x = tf.placeholder(tf.float32, shape=(None, 1536))  # access it with features["x"]
@@ -66,23 +71,26 @@ with tf.Session() as sess:
     for var in tf.trainable_variables():
         tf.summary.histogram(var.name, var)
     merged = tf.summary.merge_all()  # compute all the summaries (why name merge?)
-    folder = '../models/model4/'
+    folder = '../models/model3/'
     train_writer = tf.summary.FileWriter(folder + 'train', sess.graph)
     test_writer = tf.summary.FileWriter(folder + 'test')
 
     tf.global_variables_initializer().run()
 
-    N = 2_001
+    N = 20_001
     for n in range(N):
-        if n == N-1:
+        if n == N - 1:
             print("step {} of {}, global_step set to {}".format(n, N - 1, sess.run(tf.train.get_global_step())))
-            summary, dm, labels, times = sess.run([merged, distance_matrix, y_, time], feed_dict={x: sess.run(test_input)['x'], y_: sess.run(test_targets), time: sess.run(test_input)['time']})
+            summary, dm, labels, times = sess.run([merged, distance_matrix, y_, time],
+                                                  feed_dict={x: sess.run(test_input)['x'], y_: sess.run(test_targets),
+                                                             time: sess.run(test_input)['time']})
             evo_id = np.array([tf.compat.as_text(l) + "_t=" + str(t) for l, t in zip(labels, times)])
             np.savetxt(folder + 'test/dm.txt', dm)
             np.savetxt(folder + 'test/labels.txt', evo_id, fmt="%s")
             test_writer.add_summary(summary, global_step=sess.run(tf.train.get_global_step()))
         else:
-            # print("step {} of {}, global_step set to {}".format(n, N - 1, sess.run(tf.train.get_global_step())))
+            if n % 50 == 0:
+                print("step {} of {}, global_step set to {}".format(n, N - 1, sess.run(tf.train.get_global_step())))
             summary, _ = sess.run([merged, train_step],
                                   feed_dict={x: sess.run(train_input)['x'], y_: sess.run(train_targets)})
             train_writer.add_summary(summary, global_step=sess.run(tf.train.get_global_step()))
