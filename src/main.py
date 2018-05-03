@@ -35,32 +35,37 @@ conv1 = tf.layers.conv1d(
     padding="same",
     activation=tf.nn.relu)
 pool1 = tf.layers.max_pooling1d(inputs=conv1, pool_size=2, strides=2)  # size 64
+norm1 = tf.layers.batch_normalization(inputs=pool1)
 
 # Convolutional Layer #2 and Pooling Layer #2
 conv2 = tf.layers.conv1d(
-    inputs=pool1,
+    inputs=norm1,
     filters=64,
     kernel_size=4,
     padding="same",
     activation=tf.nn.relu)
 pool2 = tf.layers.max_pooling1d(inputs=conv2, pool_size=2, strides=2)  # size 32
+norm2 = tf.layers.batch_normalization(inputs=pool2)
 
 # Convolutional Layer #3 and Pooling Layer #3
 conv3 = tf.layers.conv1d(
-    inputs=pool2,
+    inputs=norm2,
     filters=128,
     kernel_size=4,
     padding="same",
     activation=tf.nn.relu)
 pool3 = tf.layers.max_pooling1d(inputs=conv3, pool_size=2, strides=2)  # size 16
+norm3 = tf.layers.batch_normalization(inputs=pool3)
 
 # Dense Layer
-pool3_flat = tf.reshape(pool3, [-1, 16 * 128])
-embeddings = tf.layers.dense(inputs=pool3_flat, units=1024)
+norm3_flat = tf.reshape(norm3, [-1, 16 * 128])
+embeddings = tf.layers.dense(inputs=norm3_flat, units=1024)
 
 with tf.name_scope("training") as scope:
-    loss = batch_hard_triplet_loss(labels=y_, embeddings=embeddings, margin=0.1)
-    train_step = tf.train.AdamOptimizer(0.000_1, name="Adam").minimize(loss, global_step=tf.train.create_global_step())
+    loss = batch_hard_triplet_loss(labels=y_, embeddings=embeddings, margin=0.2)
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)  # needed for batch normalizations
+    with tf.control_dependencies(update_ops):
+        train_step = tf.train.AdamOptimizer(0.000_1, name="Adam").minimize(loss, global_step=tf.train.create_global_step())
     tf.summary.scalar('loss', loss)
 
 with tf.name_scope('summaries') as scope:
@@ -69,15 +74,17 @@ with tf.name_scope('summaries') as scope:
 
 with tf.Session() as sess:
     for var in tf.trainable_variables():
-        tf.summary.histogram(var.name, var)
+        tf.summary.histogram(var.name.replace(":", "_"), var)
+        if "kernel" in var.name and "conv1d" in var.name:
+            tf.summary.image(var.name.replace(":", "_")+"_image", tf.expand_dims(var, -1))
     merged = tf.summary.merge_all()  # compute all the summaries (why name merge?)
-    folder = '../models/model3/'
+    folder = '../models/model5/'
     train_writer = tf.summary.FileWriter(folder + 'train', sess.graph)
     test_writer = tf.summary.FileWriter(folder + 'test')
 
     tf.global_variables_initializer().run()
 
-    N = 20_001
+    N = 351
     for n in range(N):
         if n == N - 1:
             print("step {} of {}, global_step set to {}".format(n, N - 1, sess.run(tf.train.get_global_step())))

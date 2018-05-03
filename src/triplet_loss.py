@@ -1,4 +1,5 @@
 # DISCLAIMER : Taken from https://github.com/omoindrot/tensorflow-triplet-loss/blob/master/model/triplet_loss.py
+# see https://omoindrot.github.io/triplet-loss
 
 
 """Define functions to create the triplet loss with online triplet mining."""
