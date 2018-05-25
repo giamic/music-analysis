@@ -1,9 +1,5 @@
 # DISCLAIMER : Taken from https://github.com/omoindrot/tensorflow-triplet-loss/blob/master/model/triplet_loss.py
 # see https://omoindrot.github.io/triplet-loss
-
-
-"""Define functions to create the triplet loss with online triplet mining."""
-
 import tensorflow as tf
 
 
@@ -144,7 +140,7 @@ def batch_all_triplet_loss(labels, embeddings, margin, squared=False):
     # triplet_loss[i, j, k] will contain the triplet loss of anchor=i, positive=j, negative=k
     # Uses broadcasting where the 1st argument has shape (batch_size, batch_size, 1)
     # and the 2nd (batch_size, 1, batch_size)
-    triplet_loss = anchor_positive_dist - anchor_negative_dist + margin
+    triplet_loss = anchor_positive_dist + margin - anchor_negative_dist
 
     # Put to zero the invalid triplets
     # (where label(a) != label(p) or label(n) == label(a) or a == p)

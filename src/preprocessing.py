@@ -111,23 +111,27 @@ def create_random_dataset(data_folder, path_output, steps, n_excerpts, n_songs=N
 
     :param data_folder: where the data is stored per song
     :param path_output: where to store the test data
-    :param steps: the number of time steps per row
+    :param steps: the number of time steps per row, convenience value to set the correct number of columns
     :param n_excerpts: the number of rows we take from each song
     :param n_songs: the number of songs we consider; if None, take all
     :return:
     """
+    logger = logging.getLogger(__name__)
     if n_songs is None:
         file_paths = [data_folder + fp for fp in os.listdir(data_folder)]  # take all the songs
     else:  # take only n_songs so far
         file_paths = np.random.choice([data_folder + fp for fp in os.listdir(data_folder)], n_songs, replace=False)
     original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
                        'G_t', 'G#_t']
+    N = len(file_paths)
     labels = original_labels[0:2]
     chromas = original_labels[2:]
     labels = labels + [c + str(s) for s in range(steps) for c in chromas]
     df_random = pd.DataFrame(columns=labels)
-    for fp in file_paths:
+    for n, fp in enumerate(file_paths):
+        logger.info("Working on {}, file {} out of {}".format(fp, n+1, N))
         df = pd.read_csv(fp, header=None, names=labels)
+        logger.info("File read, now concatenating")
         df_random = pd.concat([df_random, df.sample(n_excerpts)], ignore_index=True)
     df_random = df_random.sample(frac=1)  # shuffle the df_random
     df_random.to_csv(path_output, header=False, index=False)
@@ -140,5 +144,5 @@ if __name__ == '__main__':
     T = 128  # how many successive steps we want to put in a single row
 
     # preprocess(general_folder, by_song_folder, T)
-    create_random_dataset(by_song_folder, general_folder + 'train.csv', T, 50)
-    create_random_dataset(by_song_folder, general_folder + 'test.csv', T, 10, 10)
+    create_random_dataset(by_song_folder, general_folder + 'train2.csv', T, 20)
+    create_random_dataset(by_song_folder, general_folder + 'test2.csv', T, 2)
