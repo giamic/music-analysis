@@ -144,5 +144,5 @@ if __name__ == '__main__':
     T = 128  # how many successive steps we want to put in a single row
 
     # preprocess(general_folder, by_song_folder, T)
-    create_random_dataset(by_song_folder, general_folder + 'train2.csv', T, 20)
-    create_random_dataset(by_song_folder, general_folder + 'test2.csv', T, 2)
+    # create_random_dataset(by_song_folder, general_folder + 'train2.csv', T, 20)
+    create_random_dataset(by_song_folder, general_folder + 'test3.csv', T, 5, 40)

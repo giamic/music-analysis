@@ -22,14 +22,40 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crossera')
-train_file = os.path.join(data_folder, 'train2.csv')
-test_file = os.path.join(data_folder, 'test2.csv')
+train_file = os.path.join(data_folder, 'train_large.csv')
+test_file = os.path.join(data_folder, 'test_large.csv')
 annotations_file = os.path.join(data_folder, 'cross-era_annotations.csv')
-model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models', 'model_large_dataset_2')
+model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models', 'model_large_dataset_3')
+try:
+    os.mkdir(model_folder)
+except FileExistsError:
+    pass
+
+""" Config """
+params = {
+    'bs_test': 128,  # batch_size
+    'bs_train': 128,
+    'sb_test': 200,  # shuffle_buffer, total of 200 lines in test_large.csv
+    'sb_train': 40_000,  # total of 40_000 lines in train_large.csv
+    'loss_margin': 10,
+    'lr': 0.001,  # learning rate
+    'f1': 32,  # number of filters in the 1st layer
+    'f2': 64,
+    'f3': 128,
+    'k1': 8,  # kernel size of filters in the 1st layer (length of the filter vector)
+    'k2': 8,
+    'k3': 8,
+    'n': 512  # number of elements in the final embeddings vector
+}
+
+with open(os.path.join(model_folder, 'params.txt'), 'w') as file:
+    for (k, v) in params.items():
+        file.write("{}: {}\n".format(k, v))
+
 
 """ Data input """
-trn_itr = train_input_fn(train_file, batch_size=128, shuffle_buffer=40_000)  # total of 40_000 lines in train2.csv
-tst_itr = test_input_fn(test_file, batch_size=2_000, shuffle_buffer=2_000)  # total of 2_000 lines in test2.csv
+trn_itr = train_input_fn(train_file, batch_size=params['bs_train'], shuffle_buffer=params['sb_train'])
+tst_itr = test_input_fn(test_file, batch_size=params['bs_test'], shuffle_buffer=params['sb_test'])
 
 handle = tf.placeholder(tf.string, shape=[])
 x, song_id, time = tf.data.Iterator.from_string_handle(handle, trn_itr.output_types, trn_itr.output_shapes).get_next()
@@ -41,14 +67,14 @@ y_ = id2cmp.lookup(song_id)
 input_layer = tf.reshape(x, [-1, 128, 12])
 
 """ Calculations """
-embeddings = three_layers_conv(input_layer)
+embeddings = three_layers_conv(input_layer, params)
 
 with tf.name_scope("training") as scope:
-    loss, positive_triplets = batch_all_triplet_loss(labels=y_, embeddings=embeddings, margin=10)
+    loss, positive_triplets = batch_all_triplet_loss(labels=y_, embeddings=embeddings, margin=params['loss_margin'])
     # loss = batch_hard_triplet_loss(labels=y_, embeddings=embeddings, margin=100)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)  # needed for batch normalizations
     with tf.control_dependencies(update_ops):
-        train_step = tf.train.AdamOptimizer(0.001).minimize(loss, global_step=tf.train.create_global_step())
+        train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss, global_step=tf.train.create_global_step())
     tf.summary.scalar('loss', loss)
     tf.summary.scalar('positive_triplets', positive_triplets)
 
@@ -86,8 +112,10 @@ with tf.Session() as sess:
     N = 100_001
     count = 0
     for n in range(N):
-        print("step {} of {}, global_step set to {}".format(n, N - 1, sess.run(tf.train.get_global_step())))
+        global_step = sess.run(tf.train.get_global_step())
+        print("step {} of {}, global_step set to {}".format(n, N - 1, global_step))
 
+        # if n == 0:  # log the results on the test set and reconstruct the tree
         if n == N - 1 or (n > 0 and n % 2_000 == 0):  # log the results on the test set and reconstruct the tree
             summary, dm, labels, ids, times, l, pt = sess.run(
                 [merged, distance_matrix, y_, song_id, time, loss, positive_triplets], feed_dict={handle: tst_handle})
@@ -98,9 +126,11 @@ with tf.Session() as sess:
             np.savetxt(os.path.join(tree_folder, 'dm.txt'), dm)
             np.savetxt(os.path.join(tree_folder, 'labels.txt'), evo_id, fmt="%s")
             reconstruct_tree(tree_folder)
-            test_writer.add_summary(summary, global_step=sess.run(tf.train.get_global_step()))
+            test_writer.add_summary(summary, global_step=global_step)
             saver.save(sess, os.path.join(model_folder, "model.ckpt"))
             count += 1
-        else:  # train the network
+        elif global_step % 50 == 0:  # train and log
             summary, _ = sess.run([merged, train_step], feed_dict={handle: trn_handle})
-            train_writer.add_summary(summary, global_step=sess.run(tf.train.get_global_step()))
+            train_writer.add_summary(summary, global_step=global_step)
+        else:  # just train
+            _ = sess.run(train_step, feed_dict={handle: trn_handle})

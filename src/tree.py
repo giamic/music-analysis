@@ -1,6 +1,8 @@
 # DISCLAIMER : Taken from https://github.com/annazhukova/music/blob/master/py/matrix_formatter.py
 
 import os
+import sys
+
 import pandas as pd
 from subprocess import call
 
@@ -36,3 +38,7 @@ def reconstruct_tree(DATA_DIR):
           "--data", "/data/{}".format(os.path.split(ANNOTATIONS)[1]),
           "--html", "/data/{}".format(os.path.split(HTML)[1]), "--columns", "song", "-v"])
     return
+
+
+if __name__ == '__main__':
+    reconstruct_tree(sys.argv[1])
