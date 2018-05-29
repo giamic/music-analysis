@@ -3,21 +3,11 @@ Functions to pass the data to the
 """
 import tensorflow as tf
 import os
-import pandas as pd
-import logging
 
 DEFAULTS = [['']] + [[0.]] * 1537  # 1537 = 1 (time) + 12*128 (chroma features)
 DEFAULTS[0] = ['']
 
 # COLUMNS = ['songID', 'time', 'A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#']
-
-
-def find_id2cmp(input_path):
-    logger = logging.getLogger(__name__)
-    logger.info("Constructing the ID to composer look-up table...")
-    data = pd.read_csv(input_path)
-    logger.info("...done!")
-    return data.iloc[:, 2].values, data.iloc[:, 6].values
 
 
 def parse_csv(line):

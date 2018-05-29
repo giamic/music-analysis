@@ -27,19 +27,21 @@ def reconstruct_tree(DATA_DIR):
           "-i", "/data/{}".format(os.path.split(MATRIX)[1]), "-o", "/data/{}".format(os.path.split(TREE)[1])])
 
     # Create an annotation file mapping ids to their labels
-    df['label'] = pd.read_csv(LABELS, header=None)[0]
-    df['time'] = df['label'].str.replace('^CrossEra\-\d+_t=', '')
-    df['song'] = df['label'].str.replace('^CrossEra\-', '').str.replace('_t=\d+(\.\d+){0,1}', '')
-    df['composer'] = df['label'].map(lambda _: _[:_.find('CrossEra')])
-    df = df[['label', 'song', 'time', 'composer']]
-    df.to_csv(ANNOTATIONS, sep='\t', header=True)
+    notes = pd.read_csv(ANNOTATIONS, sep='\t')
+    df['composer'] = notes["Composer"]
+    # df['label'] = pd.read_csv(LABELS, header=None)[0]
+    # df['time'] = df['label'].str.replace('^CrossEra\-\d+_t=', '')
+    # df['song'] = df['label'].str.replace('^CrossEra\-', '').str.replace('_t=\d+(\.\d+){0,1}', '')
+    # df['composer'] = df['label'].map(lambda _: _[:_.find('CrossEra')])
+    # df = df[['label', 'song', 'time', 'composer']]
+    # df.to_csv(ANNOTATIONS, sep='\t', header=True)
 
     # Visualise a tree with pastml such as every song has its own colour (names are numerical ids)
     call(["docker", "run", "-v", "{}:/data".format(DATA_DIR), "-t", "evolbioinfo/pastml",
           "--tree", "/data/{}".format(os.path.split(TREE)[1]),
           "--data", "/data/{}".format(os.path.split(ANNOTATIONS)[1]),
           "--html", "/data/{}".format(os.path.split(HTML)[1]),
-          "--html_compressed", "/data/{}".format(os.path.split(MAP)[1]), "--columns", "composer", "-v",
+          "--html_compressed", "/data/{}".format(os.path.split(MAP)[1]), "--columns", "Composer", "-v",
           "--tip_size_threshold", '2000', '--model', 'F81'])
     return
 

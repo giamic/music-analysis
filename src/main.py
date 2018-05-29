@@ -13,7 +13,8 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from data_loading import train_input_fn, test_input_fn, find_id2cmp
+from data_loading import train_input_fn, test_input_fn
+from utils import find_id2cmp, create_annotations
 from tree import reconstruct_tree
 from models import three_layers_conv
 from triplet_loss import pairwise_distances, batch_all_triplet_loss
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crossera')
 train_file = os.path.join(data_folder, 'train_large.csv')
-test_file = os.path.join(data_folder, 'test_large.csv')
+test_file = os.path.join(data_folder, 'test_manual.csv')
 annotations_file = os.path.join(data_folder, 'cross-era_annotations.csv')
 model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models', 'model_large_dataset_3')
 try:
@@ -33,9 +34,9 @@ except FileExistsError:
 
 """ Config """
 params = {
-    'bs_test': 128,  # batch_size
+    'bs_test': 1_100,  # batch_size
+    'sb_test': 1_100,  # shuffle_buffer, total of 1_100 lines in test_manual.csv
     'bs_train': 128,
-    'sb_test': 200,  # shuffle_buffer, total of 200 lines in test_large.csv
     'sb_train': 40_000,  # total of 40_000 lines in train_large.csv
     'loss_margin': 10,
     'lr': 0.001,  # learning rate
@@ -51,7 +52,6 @@ params = {
 with open(os.path.join(model_folder, 'params.txt'), 'w') as file:
     for (k, v) in params.items():
         file.write("{}: {}\n".format(k, v))
-
 
 """ Data input """
 trn_itr = train_input_fn(train_file, batch_size=params['bs_train'], shuffle_buffer=params['sb_train'])
@@ -110,21 +110,25 @@ with tf.Session() as sess:
     # print(test)
 
     N = 100_001
-    count = 0
+    count = 50
     for n in range(N):
         global_step = sess.run(tf.train.get_global_step())
         print("step {} of {}, global_step set to {}".format(n, N - 1, global_step))
 
-        # if n == 0:  # log the results on the test set and reconstruct the tree
-        if n == N - 1 or (n > 0 and n % 2_000 == 0):  # log the results on the test set and reconstruct the tree
+        if n == 0:  # log the results on the test set and reconstruct the tree
+        # if n == N - 1 or (n > 0 and n % 2_000 == 0):  # log the results on the test set and reconstruct the tree
             summary, dm, labels, ids, times, l, pt = sess.run(
                 [merged, distance_matrix, y_, song_id, time, loss, positive_triplets], feed_dict={handle: tst_handle})
-            evo_id = np.array(
-                [tf.compat.as_text(l) + tf.compat.as_text(i) + "_t=" + str(t) for l, i, t in zip(labels, ids, times)])
             tree_folder = os.path.join(model_folder, 'test', str(count))
-            os.mkdir(tree_folder)
+            labels = list(map(lambda b: tf.compat.as_text(b), labels))
+            ids = list(map(lambda b: tf.compat.as_text(b), ids))
+            try:
+                os.mkdir(tree_folder)
+            except FileExistsError:
+                pass
             np.savetxt(os.path.join(tree_folder, 'dm.txt'), dm)
-            np.savetxt(os.path.join(tree_folder, 'labels.txt'), evo_id, fmt="%s")
+            evo_id = create_annotations(data_folder, tree_folder, ids, times)
+            # np.savetxt(os.path.join(tree_folder, 'metadata.tab'), evo_id, fmt="%s")
             reconstruct_tree(tree_folder)
             test_writer.add_summary(summary, global_step=global_step)
             saver.save(sess, os.path.join(model_folder, "model.ckpt"))
