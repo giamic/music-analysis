@@ -101,33 +101,47 @@ def find_id2cmp(input_path):
     return data.iloc[:, 2].values, data.iloc[:, 6].values
 
 
+def store_song_lengths(data_folder, output_file):
+    paths = [os.path.join(data_folder, x) for x in os.listdir(data_folder)]
+    with open(output_file, 'a') as f:
+        for n, fp in enumerate(sorted(paths)):
+            if os.path.split(fp)[-1].startswith("chroma-nnls"):
+                df = pd.read_csv(fp, header=None)
+                name = df.iloc[:, 0]
+                starts = list(map(str, np.where(~name.isna())[0]))
+                # line = os.path.split(fp)[-1] + ',' + ','.join(starts) + ',' + str(len(df)) + '\n'
+                line = str(n) + ',' + ','.join(starts) + ',' + str(len(df)) + '\n'
+                f.write(line)
+    return
+
+
 if __name__ == '__main__':
-    general_folder = "../data/dataset_audiolabs_crossera/"
-    by_song_folder = "/media/gianluca/data/PycharmProjects/music-analysis/data/dataset_audiolabs_crossera/by_song/"
-    T = 128  # how many successive steps we want to put in a single row
-
-    composers = [
-        'Bach; Johann Sebastian',
-        'Beethoven; Ludwig van',
-        'Brahms; Johannes',
-        'Chopin; Frederic',
-        'Debussy; Claude',
-        'Grieg; Edvard',
-        'Mahler; Gustav',
-        'Hindemith; Paul',
-        'Mozart; Wolfgang Amadeus',
-        'Prokofiew; Sergej',
-        'Shostakovich; Dmitri',
-    ]
-
-    logging.basicConfig(level=logging.INFO)
+    # general_folder = "../data/dataset_audiolabs_crossera/"
+    # by_song_folder = "/media/gianluca/data/PycharmProjects/music-analysis/data/dataset_audiolabs_crossera/by_song/"
+    # T = 128  # how many successive steps we want to put in a single row
+    #
+    # composers = [
+    #     'Bach; Johann Sebastian',
+    #     'Beethoven; Ludwig van',
+    #     'Brahms; Johannes',
+    #     'Chopin; Frederic',
+    #     'Debussy; Claude',
+    #     'Grieg; Edvard',
+    #     'Mahler; Gustav',
+    #     'Hindemith; Paul',
+    #     'Mozart; Wolfgang Amadeus',
+    #     'Prokofiew; Sergej',
+    #     'Shostakovich; Dmitri',
+    # ]
+    #
+    # logging.basicConfig(level=logging.INFO)
     # preprocess(general_folder, by_song_folder, T)
     # create_random_dataset(by_song_folder, general_folder + 'train2.csv', T, 20)
     # create_random_dataset(by_song_folder, general_folder + 'test2.csv', T, 5, 20)
 
-    ids, cmp = find_id2cmp(general_folder + 'cross-era_annotations.csv')
-    id2cmp = dict(zip(ids, cmp))
-    create_test_dataset(by_song_folder, general_folder + 'test_manual.csv', composers, id2cmp, T)
+    # ids, cmp = find_id2cmp(general_folder + 'cross-era_annotations.csv')
+    # id2cmp = dict(zip(ids, cmp))
+    # create_test_dataset(by_song_folder, general_folder + 'test_manual.csv', composers, id2cmp, T)
 
     # df = pd.read_csv('/home/gianluca/PycharmProjects/music-analysis/models/model_large_dataset_3/test/50/temp.txt',
     #                  sep='\t', header=None)
@@ -135,3 +149,7 @@ if __name__ == '__main__':
     # times = df.iloc[:, 2]
     # res = create_annotations(general_folder, ids, times)
     # pass
+
+    general_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
+    output_file = os.path.join(general_folder, "song_lengths.csv")
+    store_song_lengths(general_folder, output_file)
