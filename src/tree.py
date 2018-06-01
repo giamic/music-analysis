@@ -42,8 +42,9 @@ def reconstruct_tree(DATA_DIR):
           "--data", "/data/{}".format(os.path.split(ANNOTATIONS)[1]),
           "--html", "/data/{}".format(os.path.split(HTML)[1]),
           "--html_compressed", "/data/{}".format(os.path.split(MAP)[1]), "--columns", "Composer", "-v",
-          "--tip_size_threshold", '2000', '--model', 'F81'])
+          "--tip_size_threshold", '30', '--model', 'JC'])
     return
+
 
 if __name__ == '__main__':
     reconstruct_tree(sys.argv[1])

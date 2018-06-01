@@ -19,9 +19,9 @@ def create_random_dataset(data_folder, path_output, steps, n_excerpts, n_songs=N
     """
     logger = logging.getLogger(__name__)
     if n_songs is None:
-        file_paths = [data_folder + fp for fp in os.listdir(data_folder)]  # take all the songs
+        file_paths = [os.path.join(data_folder, fp) for fp in os.listdir(data_folder)]  # take all the songs
     else:  # take only n_songs so far
-        file_paths = np.random.choice([data_folder + fp for fp in os.listdir(data_folder)], n_songs, replace=False)
+        file_paths = np.random.choice([os.path.join(data_folder, fp) for fp in os.listdir(data_folder)], n_songs, replace=False)
     original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
                        'G_t', 'G#_t']
     N = len(file_paths)
@@ -33,6 +33,8 @@ def create_random_dataset(data_folder, path_output, steps, n_excerpts, n_songs=N
         logger.info("Working on {}, file {} out of {}".format(fp, n + 1, N))
         df = pd.read_csv(fp, header=None, names=labels)
         logger.info("File read, now concatenating")
+        if df.shape[0] < n_excerpts:
+            logger.warning("Too short a song in {}".format(fp))
         df_random = pd.concat([df_random, df.sample(n_excerpts)], ignore_index=True)
     df_random = df_random.sample(frac=1)  # shuffle the df_random
     df_random.to_csv(path_output, header=False, index=False)
@@ -83,12 +85,12 @@ def create_test_dataset(data_folder, path_output, composers, id2cmp, steps, n_ex
 
 
 def create_annotations(data_folder, output_folder, ids, times):
-    annotations = pd.read_csv(os.path.join(data_folder, 'cross-era_annotations.csv'))
-    names = ["index", "CrossEra-ID", "ClipTime"]
+    annotations = pd.read_csv(os.path.join(data_folder, 'cross-composer_annotations.csv'))
+    names = ["index", "CrossComp-ID", "ClipTime"]
     df = pd.DataFrame(dict(zip(names, [np.arange(len(ids)), ids, times])))
-    res = df.merge(annotations, on="CrossEra-ID")
+    res = df.merge(annotations, on="CrossComp-ID")
     res = res.sort_values("index")
-    res = res[['Composer', 'CrossEra-ID', 'ClipTime', 'CompLifetime', 'SongYear']]
+    res = res[['Composer', 'CrossComp-ID', 'ClipTime', 'CompLifetime', 'SongYear']]
     res.to_csv(os.path.join(output_folder, 'metadata.tab'), sep='\t', header=True)
     return res
 
@@ -98,7 +100,7 @@ def find_id2cmp(input_path):
     logger.info("Constructing the ID to composer look-up table...")
     data = pd.read_csv(input_path)
     logger.info("...done!")
-    return data.iloc[:, 2].values, data.iloc[:, 6].values
+    return data.iloc[:, 2].values, data.iloc[:, 3].values
 
 
 def store_song_lengths(data_folder, output_file):
@@ -116,10 +118,10 @@ def store_song_lengths(data_folder, output_file):
 
 
 if __name__ == '__main__':
-    # general_folder = "../data/dataset_audiolabs_crossera/"
-    # by_song_folder = "/media/gianluca/data/PycharmProjects/music-analysis/data/dataset_audiolabs_crossera/by_song/"
-    # T = 128  # how many successive steps we want to put in a single row
-    #
+    general_folder = "/home/gianluca/PycharmProjects/music-analysis/data/dataset_audiolabs_crosscomposer/test/chroma_features"
+    by_song_folder = "/home/gianluca/PycharmProjects/music-analysis/data/dataset_audiolabs_crosscomposer/test/chroma_features/by_song"
+    T = 128  # how many successive steps we want to put in a single row
+
     # composers = [
     #     'Bach; Johann Sebastian',
     #     'Beethoven; Ludwig van',
@@ -134,10 +136,10 @@ if __name__ == '__main__':
     #     'Shostakovich; Dmitri',
     # ]
     #
-    # logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO)
     # preprocess(general_folder, by_song_folder, T)
     # create_random_dataset(by_song_folder, general_folder + 'train2.csv', T, 20)
-    # create_random_dataset(by_song_folder, general_folder + 'test2.csv', T, 5, 20)
+    create_random_dataset(by_song_folder, general_folder + 'test.csv', T, 10)
 
     # ids, cmp = find_id2cmp(general_folder + 'cross-era_annotations.csv')
     # id2cmp = dict(zip(ids, cmp))
@@ -150,6 +152,6 @@ if __name__ == '__main__':
     # res = create_annotations(general_folder, ids, times)
     # pass
 
-    general_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
-    output_file = os.path.join(general_folder, "song_lengths.csv")
-    store_song_lengths(general_folder, output_file)
+    # general_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
+    # output_file = os.path.join(general_folder, "song_lengths.csv")
+    # store_song_lengths(general_folder, output_file)

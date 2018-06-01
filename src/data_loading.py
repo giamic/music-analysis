@@ -28,7 +28,7 @@ def parse_csv(line):
 def train_input_fn(input_path, batch_size=128, shuffle_buffer=100_000):
     """Generate an iterator to produce the training input."""
     if os.path.isdir(input_path):
-        data_file = [input_path + fp for fp in os.listdir(input_path)]
+        data_file = [os.path.join(input_path, fp) for fp in os.listdir(input_path)]
     elif os.path.isfile(input_path):
         data_file = input_path
     else:
@@ -43,10 +43,14 @@ def train_input_fn(input_path, batch_size=128, shuffle_buffer=100_000):
     return dataset.make_one_shot_iterator()
 
 
-def test_input_fn(data_file, batch_size=100, shuffle_buffer=100):
+def test_input_fn(input_path, batch_size, shuffle_buffer):
     """Generate an iterator to produce the test input."""
-    assert tf.gfile.Exists(data_file), (
-            '%s not found.' % data_file)
+    if os.path.isdir(input_path):
+        data_file = [input_path + fp for fp in os.listdir(input_path)]
+    elif os.path.isfile(input_path):
+        data_file = input_path
+    else:
+        raise ValueError("please specify a valid path, folder or file")
 
     # Extract lines from input files using the Dataset API.
     # the test.csv file contains 5 songs: the three selected for training + 2 more
@@ -67,7 +71,7 @@ def g(file_paths, composers, lengths, steps):
         ni, nf = l[idx_sng], l[idx_sng + 1]
         n = choice(np.arange(ni, max(nf - steps, ni)))
         with open(fp, 'r') as f:
-            lines = list(islice(f, n, n+steps))
+            lines = list(islice(f, n, n + steps))
             # datareader = csv.reader(f, delimiter=',')
             # x = []
             # for _ in range(n):
@@ -77,12 +81,13 @@ def g(file_paths, composers, lengths, steps):
         # yield c, n, np.array(x)
         yield lines
 
+
 if __name__ == '__main__':
-    data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
+    data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data',
+                               'dataset_audiolabs_crosscomposer', 'chroma_features')
     sl = pd.read_csv(os.path.join(data_folder, 'song_lengths.csv'), header=None)
     sl = sl.values[:, 1:]
     paths = sorted([os.path.join(data_folder, x) for x in os.listdir(data_folder)])
-    paths = np.array(paths)[np.where([os.path.split(p)[-1].startswith('chroma-nnls') for p in paths])]
     composers = [
         'Bach JS',
         'Beethoven',

@@ -22,11 +22,13 @@ from triplet_loss import pairwise_distances, batch_all_triplet_loss
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crossera')
-train_file = os.path.join(data_folder, 'train_large.csv')
-test_file = os.path.join(data_folder, 'test_manual.csv')
-annotations_file = os.path.join(data_folder, 'cross-era_annotations.csv')
-model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models', 'model_large_dataset_3')
+data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
+# train_file = os.path.join(data_folder, 'train_large.csv')
+train_path = os.path.join(data_folder, 'train', 'chroma_features', 'by_song')
+test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test.csv')
+annotations_file = os.path.join(data_folder, 'cross-composer_annotations.csv')
+model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models', 'composers_0')
+
 try:
     os.mkdir(model_folder)
 except FileExistsError:
@@ -35,9 +37,9 @@ except FileExistsError:
 """ Config """
 params = {
     'bs_test': 1_100,  # batch_size
-    'sb_test': 1_100,  # shuffle_buffer, total of 1_100 lines in test_manual.csv
+    'sb_test': 1_100,  # shuffle_buffer, total of 1_100 lines in test.csv
     'bs_train': 128,
-    'sb_train': 40_000,  # total of 40_000 lines in train_large.csv
+    'sb_train': 45_354,  # total of 45_354 lines in cross_composer/train/chroma_features/by_song folder
     'loss_margin': 10,
     'lr': 0.001,  # learning rate
     'f1': 32,  # number of filters in the 1st layer
@@ -46,7 +48,8 @@ params = {
     'k1': 8,  # kernel size of filters in the 1st layer (length of the filter vector)
     'k2': 8,
     'k3': 8,
-    'n': 512  # number of elements in the final embeddings vector
+    'n': 512,  # number of elements in the final embeddings vector
+    'steps': 2_001  # number of training steps, one epoch is 354 steps, avoid over-fitting
 }
 
 with open(os.path.join(model_folder, 'params.txt'), 'w') as file:
@@ -54,8 +57,8 @@ with open(os.path.join(model_folder, 'params.txt'), 'w') as file:
         file.write("{}: {}\n".format(k, v))
 
 """ Data input """
-trn_itr = train_input_fn(train_file, batch_size=params['bs_train'], shuffle_buffer=params['sb_train'])
-tst_itr = test_input_fn(test_file, batch_size=params['bs_test'], shuffle_buffer=params['sb_test'])
+trn_itr = train_input_fn(train_path, batch_size=params['bs_train'], shuffle_buffer=params['sb_train'])
+tst_itr = test_input_fn(test_path, batch_size=params['bs_test'], shuffle_buffer=params['sb_test'])
 
 handle = tf.placeholder(tf.string, shape=[])
 x, song_id, time = tf.data.Iterator.from_string_handle(handle, trn_itr.output_types, trn_itr.output_shapes).get_next()
@@ -106,17 +109,17 @@ with tf.Session() as sess:
 
     trn_handle = sess.run(trn_itr.string_handle())
     tst_handle = sess.run(tst_itr.string_handle())
-    # test = sess.run([y_, song_id, time], feed_dict={handle: tst_handle})
+    # test = sess.run([x, song_id, time, y_], feed_dict={handle: trn_handle})
     # print(test)
 
-    N = 100_001
-    count = 50
-    for n in range(N):
+    steps = params['steps']
+    count = 0
+    for n in range(steps):
         global_step = sess.run(tf.train.get_global_step())
-        print("step {} of {}, global_step set to {}".format(n, N - 1, global_step))
+        print("step {} of {}, global_step set to {}".format(n, steps - 1, global_step))
 
-        if n == 0:  # log the results on the test set and reconstruct the tree
-        # if n == N - 1 or (n > 0 and n % 2_000 == 0):  # log the results on the test set and reconstruct the tree
+        # if n == 0:  # log the results on the test set and reconstruct the tree
+        if n == steps - 1 or (n > 0 and n % 200 == 0):  # log the results on the test set and reconstruct the tree
             summary, dm, labels, ids, times, l, pt = sess.run(
                 [merged, distance_matrix, y_, song_id, time, loss, positive_triplets], feed_dict={handle: tst_handle})
             tree_folder = os.path.join(model_folder, 'test', str(count))
@@ -128,12 +131,11 @@ with tf.Session() as sess:
                 pass
             np.savetxt(os.path.join(tree_folder, 'dm.txt'), dm)
             evo_id = create_annotations(data_folder, tree_folder, ids, times)
-            # np.savetxt(os.path.join(tree_folder, 'metadata.tab'), evo_id, fmt="%s")
             reconstruct_tree(tree_folder)
             test_writer.add_summary(summary, global_step=global_step)
             saver.save(sess, os.path.join(model_folder, "model.ckpt"))
             count += 1
-        elif global_step % 50 == 0:  # train and log
+        elif global_step % 10 == 0:  # train and log
             summary, _ = sess.run([merged, train_step], feed_dict={handle: trn_handle})
             train_writer.add_summary(summary, global_step=global_step)
         else:  # just train
