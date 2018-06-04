@@ -9,15 +9,15 @@ IDEA FOR THE ALGORITHM:
 
 import logging
 import os
+from datetime import datetime
 
-import numpy as np
 import tensorflow as tf
 
 from data_loading import train_input_fn, test_input_fn
-from utils import find_id2cmp, create_annotations
-from tree import reconstruct_tree
 from models import three_layers_conv
+from tree import tree_analysis
 from triplet_loss import pairwise_distances, batch_all_triplet_loss
+from utils import find_id2cmp, clustering
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'da
 train_path = os.path.join(data_folder, 'train', 'chroma_features', 'by_song')
 test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test.csv')
 annotations_file = os.path.join(data_folder, 'cross-composer_annotations.csv')
-model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models', 'composers_0')
+model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models', 'composers_2')
 
 try:
     os.mkdir(model_folder)
@@ -37,7 +37,7 @@ except FileExistsError:
 """ Config """
 params = {
     'bs_test': 1_100,  # batch_size
-    'sb_test': 1_100,  # shuffle_buffer, total of 1_100 lines in test.csv
+    'sb_test': None,  # shuffle_buffer, total of 1_100 lines in test.csv, don't shuffle if None
     'bs_train': 128,
     'sb_train': 45_354,  # total of 45_354 lines in cross_composer/train/chroma_features/by_song folder
     'loss_margin': 10,
@@ -113,28 +113,21 @@ with tf.Session() as sess:
     # print(test)
 
     steps = params['steps']
-    count = 0
     for n in range(steps):
         global_step = sess.run(tf.train.get_global_step())
         print("step {} of {}, global_step set to {}".format(n, steps - 1, global_step))
 
         # if n == 0:  # log the results on the test set and reconstruct the tree
         if n == steps - 1 or (n > 0 and n % 200 == 0):  # log the results on the test set and reconstruct the tree
-            summary, dm, labels, ids, times, l, pt = sess.run(
-                [merged, distance_matrix, y_, song_id, time, loss, positive_triplets], feed_dict={handle: tst_handle})
-            tree_folder = os.path.join(model_folder, 'test', str(count))
-            labels = list(map(lambda b: tf.compat.as_text(b), labels))
-            ids = list(map(lambda b: tf.compat.as_text(b), ids))
-            try:
-                os.mkdir(tree_folder)
-            except FileExistsError:
-                pass
-            np.savetxt(os.path.join(tree_folder, 'dm.txt'), dm)
-            evo_id = create_annotations(data_folder, tree_folder, ids, times)
-            reconstruct_tree(tree_folder)
+            summary, y, labels, dm, ids, times, l, pt = sess.run(
+                [merged, embeddings, y_, distance_matrix, song_id, time, loss, positive_triplets],
+                feed_dict={handle: tst_handle})
             test_writer.add_summary(summary, global_step=global_step)
             saver.save(sess, os.path.join(model_folder, "model.ckpt"))
-            count += 1
+            output_folder = os.path.join(model_folder, 'test', datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+            os.mkdir(output_folder)
+            clustering(labels, y, output_folder)
+            tree_analysis(dm, ids, times, data_folder, output_folder)
         elif global_step % 10 == 0:  # train and log
             summary, _ = sess.run([merged, train_step], feed_dict={handle: trn_handle})
             train_writer.add_summary(summary, global_step=global_step)

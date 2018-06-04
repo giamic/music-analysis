@@ -4,6 +4,7 @@ from random import shuffle
 
 import numpy as np
 import pandas as pd
+from sklearn.cluster import KMeans
 
 
 def create_random_dataset(data_folder, path_output, steps, n_excerpts, n_songs=None):
@@ -21,7 +22,8 @@ def create_random_dataset(data_folder, path_output, steps, n_excerpts, n_songs=N
     if n_songs is None:
         file_paths = [os.path.join(data_folder, fp) for fp in os.listdir(data_folder)]  # take all the songs
     else:  # take only n_songs so far
-        file_paths = np.random.choice([os.path.join(data_folder, fp) for fp in os.listdir(data_folder)], n_songs, replace=False)
+        file_paths = np.random.choice([os.path.join(data_folder, fp) for fp in os.listdir(data_folder)], n_songs,
+                                      replace=False)
     original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
                        'G_t', 'G#_t']
     N = len(file_paths)
@@ -73,7 +75,9 @@ def create_test_dataset(data_folder, path_output, composers, id2cmp, steps, n_ex
                 df = pd.read_csv(fp, header=None, names=labels)
                 df_random = pd.concat([df_random, df.sample(n_excerpts)], ignore_index=True)
                 composers[c] -= 1
-                logger.info("This piece was by {}. Still {} by him to find. Still {} in total.".format(c, composers[c], sum(composers.values())))
+                logger.info("This piece was by {}. Still {} by him to find. Still {} in total.".format(c, composers[c],
+                                                                                                       sum(
+                                                                                                           composers.values())))
                 if composers[c] == 0:
                     logger.info("Finished to analyse pieces by {}".format(c))
         if sum(composers.values()) > 0:
@@ -82,17 +86,6 @@ def create_test_dataset(data_folder, path_output, composers, id2cmp, steps, n_ex
     df_random = df_random.sample(frac=1)  # shuffle the df_random
     df_random.to_csv(path_output, header=False, index=False)
     return
-
-
-def create_annotations(data_folder, output_folder, ids, times):
-    annotations = pd.read_csv(os.path.join(data_folder, 'cross-composer_annotations.csv'))
-    names = ["index", "CrossComp-ID", "ClipTime"]
-    df = pd.DataFrame(dict(zip(names, [np.arange(len(ids)), ids, times])))
-    res = df.merge(annotations, on="CrossComp-ID")
-    res = res.sort_values("index")
-    res = res[['Composer', 'CrossComp-ID', 'ClipTime', 'CompLifetime', 'SongYear']]
-    res.to_csv(os.path.join(output_folder, 'metadata.tab'), sep='\t', header=True)
-    return res
 
 
 def find_id2cmp(input_path):
@@ -114,6 +107,16 @@ def store_song_lengths(data_folder, output_file):
                 # line = os.path.split(fp)[-1] + ',' + ','.join(starts) + ',' + str(len(df)) + '\n'
                 line = str(n) + ',' + ','.join(starts) + ',' + str(len(df)) + '\n'
                 f.write(line)
+    return
+
+
+def clustering(targets, y, output_path, n_clusters=11):
+    km = KMeans(n_clusters).fit(y)
+    with open(os.path.join(output_path, 'clustering.txt'), 'a') as f:
+        f.write('predict: {}\n'.format(list(l for l in km.labels_)))
+        f.write('targets: {}\n'.format(list(t for t in targets)))
+        f.write('cluster_centers:\n{}\n'.format(list(r for r in km.cluster_centers_)))
+        f.write('inertia: {}\n'.format(km.inertia_))
     return
 
 
