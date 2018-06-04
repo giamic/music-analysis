@@ -5,6 +5,7 @@ from random import shuffle
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
+from sklearn.metrics import adjusted_rand_score
 
 
 def create_random_dataset(data_folder, path_output, steps, n_excerpts, n_songs=None):
@@ -112,11 +113,13 @@ def store_song_lengths(data_folder, output_file):
 
 def clustering(targets, y, output_path, n_clusters=11):
     km = KMeans(n_clusters).fit(y)
+    ari = adjusted_rand_score(targets, km.labels_)
     with open(os.path.join(output_path, 'clustering.txt'), 'a') as f:
         f.write('predict: {}\n'.format(list(l for l in km.labels_)))
         f.write('targets: {}\n'.format(list(t for t in targets)))
-        f.write('cluster_centers:\n{}\n'.format(list(r for r in km.cluster_centers_)))
         f.write('inertia: {}\n'.format(km.inertia_))
+        f.write('adjusted Rand index: {}\n'.format(ari))
+    np.savetxt(os.path.join(output_path, "cc.mat"), km.cluster_centers_)
     return
 
 
@@ -158,3 +161,18 @@ if __name__ == '__main__':
     # general_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
     # output_file = os.path.join(general_folder, "song_lengths.csv")
     # store_song_lengths(general_folder, output_file)
+
+
+def count_params(variables, param_file):
+    """
+    Print number of trainable variables.
+
+    :param variables: as coming from tf.trainable_variables()
+    """
+    n = 0
+    for v in variables:
+        n += np.prod(v.get_shape().as_list())
+    with open(param_file, 'a') as f:
+        f.write("total_parameters: {}".format(n))
+    print("total_parameters: {}".format(n))
+    return

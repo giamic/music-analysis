@@ -14,20 +14,21 @@ from datetime import datetime
 import tensorflow as tf
 
 from data_loading import train_input_fn, test_input_fn
-from models import three_layers_conv
+from models import three_cl_bn_pool_relu, three_cl_pool_sigm
 from tree import tree_analysis
 from triplet_loss import pairwise_distances, batch_all_triplet_loss
-from utils import find_id2cmp, clustering
+from utils import find_id2cmp, clustering, count_params
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+model = three_cl_pool_sigm
 data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
 # train_file = os.path.join(data_folder, 'train_large.csv')
 train_path = os.path.join(data_folder, 'train', 'chroma_features', 'by_song')
 test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test.csv')
 annotations_file = os.path.join(data_folder, 'cross-composer_annotations.csv')
-model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models', 'composers_2')
+model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models', model.__name__ + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
 
 try:
     os.mkdir(model_folder)
@@ -40,17 +41,19 @@ params = {
     'sb_test': None,  # shuffle_buffer, total of 1_100 lines in test.csv, don't shuffle if None
     'bs_train': 128,
     'sb_train': 45_354,  # total of 45_354 lines in cross_composer/train/chroma_features/by_song folder
+    'x.shape': [-1, 128, 12],
     'loss_margin': 10,
     'lr': 0.001,  # learning rate
-    'f1': 32,  # number of filters in the 1st layer
-    'f2': 64,
-    'f3': 128,
-    'k1': 8,  # kernel size of filters in the 1st layer (length of the filter vector)
-    'k2': 8,
-    'k3': 8,
-    'n': 512,  # number of elements in the final embeddings vector
-    'steps': 2_001  # number of training steps, one epoch is 354 steps, avoid over-fitting
+    'f1': 16,  # number of filters in the 1st layer
+    'f2': 24,
+    'f3': 32,
+    'k1': 4,  # kernel size of filters in the 1st layer (length of the filter vector)
+    'k2': 4,
+    'k3': 4,
+    'n': 64,  # number of elements in the final embeddings vector
+    'steps': 3_001  # number of training steps, one epoch is 354 steps, avoid over-fitting
 }
+params['steps_per_epoch'] = params['sb_train'] / params['bs_train']
 
 with open(os.path.join(model_folder, 'params.txt'), 'w') as file:
     for (k, v) in params.items():
@@ -67,10 +70,10 @@ keys, values = find_id2cmp(annotations_file)
 id2cmp = tf.contrib.lookup.HashTable(tf.contrib.lookup.KeyValueTensorInitializer(keys, values), "")
 y_ = id2cmp.lookup(song_id)
 
-input_layer = tf.reshape(x, [-1, 128, 12])
+input_layer = tf.reshape(x, params['x.shape'])
 
 """ Calculations """
-embeddings = three_layers_conv(input_layer, params)
+embeddings = model(input_layer, params)
 
 with tf.name_scope("training") as scope:
     loss, positive_triplets = batch_all_triplet_loss(labels=y_, embeddings=embeddings, margin=params['loss_margin'])
@@ -100,6 +103,8 @@ with tf.Session() as sess:
     tf.tables_initializer().run()
     saver = tf.train.Saver()
 
+    count_params(tf.trainable_variables(), os.path.join(model_folder, 'params.txt'))
+
     try:
         logger.info("Trying to find a previous model checkpoint.")
         saver.restore(sess, os.path.join(model_folder, "model.ckpt"))
@@ -116,7 +121,6 @@ with tf.Session() as sess:
     for n in range(steps):
         global_step = sess.run(tf.train.get_global_step())
         print("step {} of {}, global_step set to {}".format(n, steps - 1, global_step))
-
         # if n == 0:  # log the results on the test set and reconstruct the tree
         if n == steps - 1 or (n > 0 and n % 200 == 0):  # log the results on the test set and reconstruct the tree
             summary, y, labels, dm, ids, times, l, pt = sess.run(

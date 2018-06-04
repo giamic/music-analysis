@@ -20,19 +20,20 @@ def _create_annotations(data_folder, output_folder, ids, times):
 
 
 def _reconstruct_tree(DATA_DIR):
-    DM = os.path.join(DATA_DIR, 'dm.txt')
     MATRIX = os.path.join(DATA_DIR, 'matrix.phy')
     TREE = os.path.join(DATA_DIR, 'tree.nwk')
+    INFO = os.path.join(DATA_DIR, 'fastME.info')
 
-    # Create a matrix with numbers as ids
-    df = pd.read_table(DM, header=None, sep=' ')
-    with open(MATRIX, 'w+') as f:
-        f.write('{}\n'.format(len(df)))
-    df.to_csv(MATRIX, sep='\t', header=False, mode='a')
+    # # Create a matrix with numbers as ids
+    # df = pd.read_table(DM, header=None, sep=' ')
+    # with open(MATRIX, 'w+') as f:
+    #     f.write('{}\n'.format(len(df)))
+    # df.to_csv(MATRIX, sep='\t', header=False, mode='a')
 
     # Reconstruct a tree from the matrix
     call(["docker", "run", "-v", "{}:/data".format(DATA_DIR), "-t", "evolbioinfo/fastme:v2.1.6.1",
-          "-i", "/data/{}".format(os.path.split(MATRIX)[1]), "-o", "/data/{}".format(os.path.split(TREE)[1])])
+          "-i", "/data/{}".format(os.path.split(MATRIX)[1]), "-o", "/data/{}".format(os.path.split(TREE)[1]),
+          "-I", "/data/{}".format(os.path.split(INFO)[1])])
     return
 
 
@@ -59,7 +60,13 @@ def tree_analysis(dm, ids, times, data_folder, output_folder):
         os.mkdir(output_folder)
     except FileExistsError:
         pass
-    np.savetxt(os.path.join(output_folder, 'dm.txt'), dm)
+
+    matrix_fp = os.path.join(output_folder, 'matrix.phy')
+    df = pd.DataFrame(dm)
+    with open(matrix_fp, 'w+') as f:
+        f.write('{}\n'.format(len(df)))
+    df.to_csv(matrix_fp, sep='\t', header=False, mode='a')
+
     _create_annotations(data_folder, output_folder, ids, times)
     _reconstruct_tree(output_folder)
     _visualize_tree(output_folder)
