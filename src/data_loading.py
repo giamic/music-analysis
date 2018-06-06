@@ -31,7 +31,10 @@ def train_input_fn(input_path, batch_size=128, shuffle_buffer=100_000):
     dataset = tf.data.TextLineDataset(data_file)
 
     # We call repeat after shuffling, rather than before, to prevent separate epochs from blending together.
-    dataset = dataset.map(parse_csv).shuffle(shuffle_buffer).repeat().batch(batch_size)
+    if shuffle_buffer is None:
+        dataset = dataset.map(parse_csv).repeat().batch(batch_size)
+    else:
+        dataset = dataset.map(parse_csv).shuffle(shuffle_buffer).repeat().batch(batch_size)
 
     return dataset.make_one_shot_iterator()
 

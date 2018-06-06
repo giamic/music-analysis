@@ -1,4 +1,4 @@
-# DISCLAIMER : Taken from https://github.com/annazhukova/music/blob/master/py/matrix_formatter.py
+# DISCLAIMER : rewritten from https://github.com/annazhukova/music/blob/master/py/matrix_formatter.py
 import os
 import sys
 from subprocess import call
@@ -8,7 +8,16 @@ import pandas as pd
 import tensorflow as tf
 
 
-def _create_annotations(data_folder, output_folder, ids, times):
+def _create_dm_file(dm, output_folder):
+    matrix_fp = os.path.join(output_folder, 'matrix.phy')
+    df = pd.DataFrame(dm)
+    with open(matrix_fp, 'w+') as f:
+        f.write('{}\n'.format(len(df)))
+    df.to_csv(matrix_fp, sep='\t', header=False, mode='a')
+    return
+
+
+def _create_annotations(ids, times, data_folder, output_folder):
     annotations = pd.read_csv(os.path.join(data_folder, 'cross-composer_annotations.csv'))
     names = ["index", "CrossComp-ID", "ClipTime"]
     df = pd.DataFrame(dict(zip(names, [np.arange(len(ids)), ids, times])))
@@ -23,12 +32,6 @@ def _reconstruct_tree(DATA_DIR):
     MATRIX = os.path.join(DATA_DIR, 'matrix.phy')
     TREE = os.path.join(DATA_DIR, 'tree.nwk')
     INFO = os.path.join(DATA_DIR, 'fastME.info')
-
-    # # Create a matrix with numbers as ids
-    # df = pd.read_table(DM, header=None, sep=' ')
-    # with open(MATRIX, 'w+') as f:
-    #     f.write('{}\n'.format(len(df)))
-    # df.to_csv(MATRIX, sep='\t', header=False, mode='a')
 
     # Reconstruct a tree from the matrix
     call(["docker", "run", "-v", "{}:/data".format(DATA_DIR), "-t", "evolbioinfo/fastme:v2.1.6.1",
@@ -61,13 +64,8 @@ def tree_analysis(dm, ids, times, data_folder, output_folder):
     except FileExistsError:
         pass
 
-    matrix_fp = os.path.join(output_folder, 'matrix.phy')
-    df = pd.DataFrame(dm)
-    with open(matrix_fp, 'w+') as f:
-        f.write('{}\n'.format(len(df)))
-    df.to_csv(matrix_fp, sep='\t', header=False, mode='a')
-
-    _create_annotations(data_folder, output_folder, ids, times)
+    _create_dm_file(dm, output_folder)
+    _create_annotations(ids, times, data_folder, output_folder)
     _reconstruct_tree(output_folder)
     _visualize_tree(output_folder)
     return

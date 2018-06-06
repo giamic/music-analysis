@@ -44,6 +44,21 @@ def create_random_dataset(data_folder, path_output, steps, n_excerpts, n_songs=N
     return
 
 
+def count_params(variables, param_file):
+    """
+    Print number of trainable variables.
+
+    :param variables: as coming from tf.trainable_variables()
+    """
+    n = 0
+    for v in variables:
+        n += np.prod(v.get_shape().as_list())
+    with open(param_file, 'a') as f:
+        f.write("total_parameters: {}".format(n))
+    print("total_parameters: {}".format(n))
+    return
+
+
 def create_test_dataset(data_folder, path_output, composers, id2cmp, steps, n_excerpts=10, n_songs=10):
     """
     Create a file containing a dataset with random picks from the different songs.
@@ -55,13 +70,12 @@ def create_test_dataset(data_folder, path_output, composers, id2cmp, steps, n_ex
     :param n_songs: the number of songs we consider; if None, take all
     :return:
     """
-    composers = dict(zip(composers, np.ones(len(composers)) * n_songs))
     logger = logging.getLogger(__name__)
+    composers = dict(zip(composers, np.ones(len(composers)) * n_songs))
     file_paths = [data_folder + fp for fp in os.listdir(data_folder)]  # take all the songs
     shuffle(file_paths)
     original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
                        'G_t', 'G#_t']
-    N = len(file_paths)
     labels = original_labels[0:2]
     chromas = original_labels[2:]
     labels = labels + [c + str(s) for s in range(steps) for c in chromas]
@@ -76,14 +90,43 @@ def create_test_dataset(data_folder, path_output, composers, id2cmp, steps, n_ex
                 df = pd.read_csv(fp, header=None, names=labels)
                 df_random = pd.concat([df_random, df.sample(n_excerpts)], ignore_index=True)
                 composers[c] -= 1
-                logger.info("This piece was by {}. Still {} by him to find. Still {} in total.".format(c, composers[c],
-                                                                                                       sum(
-                                                                                                           composers.values())))
+                logger.info("This piece was by {}. Still {} by him to find. Still {} in total.".
+                            format(c, composers[c], sum(composers.values())))
                 if composers[c] == 0:
                     logger.info("Finished to analyse pieces by {}".format(c))
         if sum(composers.values()) > 0:
             logger.info("Doing a second round trip.")
             logger.info("{}".format(composers))
+    df_random = df_random.sample(frac=1)  # shuffle the df_random
+    df_random.to_csv(path_output, header=False, index=False)
+    return
+
+
+def create_train_dataset(data_folder, path_output, steps):
+    """
+    Create a file containing a dataset with random picks from the different songs.
+
+    :param data_folder: where the data is stored per song
+    :param path_output: where to store the test data
+    :param steps: the number of time steps per row, convenience value to set the correct number of columns
+    :param n_excerpts: the number of rows we take from each song
+    :param n_songs: the number of songs we consider; if None, take all
+    :return:
+    """
+    logger = logging.getLogger(__name__)
+    file_paths = [data_folder + fp for fp in os.listdir(data_folder)]  # take all the songs
+    N = len(file_paths)
+    shuffle(file_paths)
+    original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
+                       'G_t', 'G#_t']
+    labels = original_labels[0:2]
+    chromas = original_labels[2:]
+    labels = labels + [c + str(s) for s in range(steps) for c in chromas]
+    df_random = pd.DataFrame(columns=labels)
+    for n, fp in enumerate(file_paths):
+        logger.info("Working on {}, file {} out of {}".format(fp, n + 1, N))
+        df = pd.read_csv(fp, header=None, names=labels)
+        df_random = pd.concat([df_random, df], ignore_index=True)
     df_random = df_random.sample(frac=1)  # shuffle the df_random
     df_random.to_csv(path_output, header=False, index=False)
     return
@@ -124,8 +167,8 @@ def clustering(targets, y, output_path, n_clusters=11):
 
 
 if __name__ == '__main__':
-    general_folder = "/home/gianluca/PycharmProjects/music-analysis/data/dataset_audiolabs_crosscomposer/test/chroma_features"
-    by_song_folder = "/home/gianluca/PycharmProjects/music-analysis/data/dataset_audiolabs_crosscomposer/test/chroma_features/by_song"
+    general_folder = "/home/gianluca/PycharmProjects/music-analysis/data/dataset_audiolabs_crosscomposer/train/chroma_features/"
+    by_song_folder = "/home/gianluca/PycharmProjects/music-analysis/data/dataset_audiolabs_crosscomposer/train/chroma_features/by_song/"
     T = 128  # how many successive steps we want to put in a single row
 
     # composers = [
@@ -145,7 +188,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     # preprocess(general_folder, by_song_folder, T)
     # create_random_dataset(by_song_folder, general_folder + 'train2.csv', T, 20)
-    create_random_dataset(by_song_folder, general_folder + 'test.csv', T, 10)
+    # create_random_dataset(by_song_folder, general_folder + 'test.csv', T, 10)
+    create_train_dataset(by_song_folder, general_folder + 'train.csv', T)
 
     # ids, cmp = find_id2cmp(general_folder + 'cross-era_annotations.csv')
     # id2cmp = dict(zip(ids, cmp))
@@ -161,18 +205,3 @@ if __name__ == '__main__':
     # general_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
     # output_file = os.path.join(general_folder, "song_lengths.csv")
     # store_song_lengths(general_folder, output_file)
-
-
-def count_params(variables, param_file):
-    """
-    Print number of trainable variables.
-
-    :param variables: as coming from tf.trainable_variables()
-    """
-    n = 0
-    for v in variables:
-        n += np.prod(v.get_shape().as_list())
-    with open(param_file, 'a') as f:
-        f.write("total_parameters: {}".format(n))
-    print("total_parameters: {}".format(n))
-    return
