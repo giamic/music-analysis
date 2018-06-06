@@ -6,53 +6,38 @@ import os
 
 import tensorflow as tf
 
-DEFAULTS = [['']] + [[0.]] * 1537  # 1537 = 1 (time) + 12*128 (chroma features)
-DEFAULTS[0] = ['']
 
-
-def parse_csv(line):
-    columns = tf.decode_csv(line, record_defaults=DEFAULTS)  # take a line at a time
-    song_id = columns[0]
-    time = columns[1]
-    x = tf.stack(columns[2:])
+def _parse_function(proto):
+    f = {
+        "song_id": tf.FixedLenSequenceFeature([], tf.int64, default_value=1, allow_missing=True),
+        "time": tf.FixedLenSequenceFeature([], tf.float32, default_value=0.0, allow_missing=True),
+        "x": tf.FixedLenSequenceFeature([], tf.float32, default_value=0.0, allow_missing=True)
+    }
+    parsed_features = tf.parse_single_example(proto, f)
+    song_id = parsed_features["song_id"]
+    time = parsed_features["time"]
+    x = parsed_features["x"]
     return x, song_id, time
 
 
-def train_input_fn(input_path, batch_size=128, shuffle_buffer=100_000):
-    """Generate an iterator to produce the training input."""
+def create_tfrecords_iterator(input_path, batch_size, shuffle_buffer):
+    """
+
+    :param input_path:
+    :param batch_size:
+    :param shuffle_buffer:
+    :return:
+    """
     if os.path.isdir(input_path):
         data_file = [os.path.join(input_path, fp) for fp in os.listdir(input_path)]
     elif os.path.isfile(input_path):
         data_file = input_path
     else:
         raise ValueError("please specify a valid path, folder or file")
-
-    # Extract lines from input files using the Dataset API.
-    dataset = tf.data.TextLineDataset(data_file)
-
-    # We call repeat after shuffling, rather than before, to prevent separate epochs from blending together.
+    dataset = tf.data.TFRecordDataset(data_file)
     if shuffle_buffer is None:
-        dataset = dataset.map(parse_csv).repeat().batch(batch_size)
+        dataset = dataset.map(_parse_function, num_parallel_calls=16).repeat().batch(batch_size)
     else:
-        dataset = dataset.map(parse_csv).shuffle(shuffle_buffer).repeat().batch(batch_size)
-
-    return dataset.make_one_shot_iterator()
-
-
-def test_input_fn(input_path, batch_size, shuffle_buffer):
-    """Generate an iterator to produce the test input."""
-    if os.path.isdir(input_path):
-        data_file = [input_path + fp for fp in os.listdir(input_path)]
-    elif os.path.isfile(input_path):
-        data_file = input_path
-    else:
-        raise ValueError("please specify a valid path, folder or file")
-
-    # Extract lines from input files using the Dataset API.
-    dataset = tf.data.TextLineDataset(data_file)
-    if shuffle_buffer is None:
-        dataset = dataset.map(parse_csv).repeat().batch(batch_size)
-    else:
-        dataset = dataset.map(parse_csv).shuffle(shuffle_buffer).repeat().batch(batch_size)
+        dataset = dataset.map(_parse_function, num_parallel_calls=16).shuffle(shuffle_buffer).repeat().batch(batch_size)
 
     return dataset.make_one_shot_iterator()

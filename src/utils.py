@@ -4,8 +4,49 @@ from random import shuffle
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
+
+
+def encode_labels(song_id, one_hot):
+    """
+    Transform the song_id in one_hot encoded by composer taking advantage of the fact that there are exactly 100 songs
+    per composer and that they are ordered by ID, so that everything between 1 and 100 included is composed by Bach,
+    between 101 and 200 -> Beethoven and so on.
+
+    :param song_id:
+    :param one_hot: boolean, if True then return the one-hot encoded version, otherwise the name of the composer
+    :return:
+    """
+    comp_id = tf.cast(tf.divide(song_id - 1, 100), tf.int64)
+    y_ = tf.one_hot(comp_id, 11) if one_hot else comp_id
+
+    # squeeze is necessary because tf.graph doesn't know that there is only one songID per data point
+    return tf.squeeze(y_, 1)
+
+
+def count_params(variables, param_file):
+    """
+    Print number of trainable variables.
+
+    :param variables: as coming from tf.trainable_variables()
+    """
+    n = 0
+    for v in variables:
+        n += np.prod(v.get_shape().as_list())
+    with open(param_file, 'a') as f:
+        f.write("total_parameters: {}".format(n))
+    print("total_parameters: {}".format(n))
+    return
+
+
+def find_id2cmp(input_path):
+    logger = logging.getLogger(__name__)
+    logger.info("Constructing the ID to composer look-up table...")
+    data = pd.read_csv(input_path)
+    logger.info("...done!")
+    return data.iloc[:, 2].values, data.iloc[:, 3].values, data.iloc[:, 3].unique()
 
 
 def create_random_dataset(data_folder, path_output, steps, n_excerpts, n_songs=None):
@@ -41,21 +82,6 @@ def create_random_dataset(data_folder, path_output, steps, n_excerpts, n_songs=N
         df_random = pd.concat([df_random, df.sample(n_excerpts)], ignore_index=True)
     df_random = df_random.sample(frac=1)  # shuffle the df_random
     df_random.to_csv(path_output, header=False, index=False)
-    return
-
-
-def count_params(variables, param_file):
-    """
-    Print number of trainable variables.
-
-    :param variables: as coming from tf.trainable_variables()
-    """
-    n = 0
-    for v in variables:
-        n += np.prod(v.get_shape().as_list())
-    with open(param_file, 'a') as f:
-        f.write("total_parameters: {}".format(n))
-    print("total_parameters: {}".format(n))
     return
 
 
@@ -132,14 +158,6 @@ def create_train_dataset(data_folder, path_output, steps):
     return
 
 
-def find_id2cmp(input_path):
-    logger = logging.getLogger(__name__)
-    logger.info("Constructing the ID to composer look-up table...")
-    data = pd.read_csv(input_path)
-    logger.info("...done!")
-    return data.iloc[:, 2].values, data.iloc[:, 3].values
-
-
 def store_song_lengths(data_folder, output_file):
     paths = [os.path.join(data_folder, x) for x in os.listdir(data_folder)]
     with open(output_file, 'a') as f:
@@ -154,8 +172,20 @@ def store_song_lengths(data_folder, output_file):
     return
 
 
-def clustering(targets, y, output_path, n_clusters=11):
-    km = KMeans(n_clusters).fit(y)
+def clustering_classification(targets, embeddings, output_path, n_clusters=11):
+    """
+    Cluster the embeddings with 11 clusters (that is, the number of composers we have).
+    Ideally, there would be a bijective correspondence between composers and clusters.
+    Check if the clustering is compatible with the real labels through adjusted Rand index (or score).
+    Calculate and save to file the metrics.
+
+    :param targets: the label associated to every elemennt
+    :param embeddings:
+    :param output_path:
+    :param n_clusters:
+    :return:
+    """
+    km = KMeans(n_clusters).fit(embeddings)
     ari = adjusted_rand_score(targets, km.labels_)
     with open(os.path.join(output_path, 'clustering.txt'), 'a') as f:
         f.write('predict: {}\n'.format(list(l for l in km.labels_)))
@@ -163,6 +193,22 @@ def clustering(targets, y, output_path, n_clusters=11):
         f.write('inertia: {}\n'.format(km.inertia_))
         f.write('adjusted Rand index: {}\n'.format(ari))
     np.savetxt(os.path.join(output_path, "cc.mat"), km.cluster_centers_)
+    return
+
+
+def transform_into_tfrecord(data_path, output_path):
+    csv = pd.read_csv(data_path, header=None).values
+    N = len(csv)
+    with tf.python_io.TFRecordWriter(output_path) as writer:
+        for n, row in enumerate(csv):
+            if n % 1000 == 0:
+                print("Row {} of {}".format(n, N))
+            song_id, time, x = int(row[0][-4:]), row[1], row[2:]
+            example = tf.train.Example()
+            example.features.feature["song_id"].int64_list.value.append(song_id)
+            example.features.feature["time"].float_list.value.append(time)
+            example.features.feature["x"].float_list.value.extend(x)
+            writer.write(example.SerializeToString())
     return
 
 
@@ -189,8 +235,8 @@ if __name__ == '__main__':
     # preprocess(general_folder, by_song_folder, T)
     # create_random_dataset(by_song_folder, general_folder + 'train2.csv', T, 20)
     # create_random_dataset(by_song_folder, general_folder + 'test.csv', T, 10)
-    create_train_dataset(by_song_folder, general_folder + 'train.csv', T)
-
+    # create_train_dataset(by_song_folder, general_folder + 'train.csv', T)
+    transform_into_tfrecord(general_folder + 'train.csv', general_folder + 'train.tfrecords')
     # ids, cmp = find_id2cmp(general_folder + 'cross-era_annotations.csv')
     # id2cmp = dict(zip(ids, cmp))
     # create_test_dataset(by_song_folder, general_folder + 'test_manual.csv', composers, id2cmp, T)

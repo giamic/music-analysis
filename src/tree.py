@@ -5,7 +5,6 @@ from subprocess import call
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 
 
 def _create_dm_file(dm, output_folder):
@@ -17,12 +16,10 @@ def _create_dm_file(dm, output_folder):
     return
 
 
-def _create_annotations(ids, times, data_folder, output_folder):
-    annotations = pd.read_csv(os.path.join(data_folder, 'cross-composer_annotations.csv'))
+def _create_metadata(ids, times, annotations, output_folder):
     names = ["index", "CrossComp-ID", "ClipTime"]
     df = pd.DataFrame(dict(zip(names, [np.arange(len(ids)), ids, times])))
-    res = df.merge(annotations, on="CrossComp-ID")
-    res = res.sort_values("index")
+    res = df.merge(annotations, on="CrossComp-ID").sort_values("index").set_index("index")
     res = res[['Composer', 'CrossComp-ID', 'ClipTime', 'CompLifetime', 'SongYear']]
     res.to_csv(os.path.join(output_folder, 'metadata.tab'), sep='\t', header=True)
     return
@@ -56,16 +53,16 @@ def _visualize_tree(DATA_DIR):
     return
 
 
-def tree_analysis(dm, ids, times, data_folder, output_folder):
-    ids = list(map(lambda b: tf.compat.as_text(b), ids))
-
+def tree_analysis(dm, ids, times, annotations, output_folder):
+    ids = list(map(lambda x: 'CrossComp-' + str(x[0]).zfill(4), ids))
+    times = list(map(lambda x: x[0], times))
     try:
         os.mkdir(output_folder)
     except FileExistsError:
         pass
 
     _create_dm_file(dm, output_folder)
-    _create_annotations(ids, times, data_folder, output_folder)
+    _create_metadata(ids, times, annotations, output_folder)
     _reconstruct_tree(output_folder)
     _visualize_tree(output_folder)
     return
