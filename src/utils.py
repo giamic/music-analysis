@@ -37,7 +37,7 @@ def count_params(variables, param_file):
         n += np.prod(v.get_shape().as_list())
     with open(param_file, 'a') as f:
         f.write("total_parameters: {}".format(n))
-    print("total_parameters: {}".format(n))
+    # print("total_parameters: {}".format(n))
     return
 
 
