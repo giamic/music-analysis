@@ -22,10 +22,11 @@ def _parse_function(proto):
 
 def create_tfrecords_iterator(input_path, batch_size, shuffle_buffer):
     """
+    Create an iterator over the TFRecords file with chroma features.
 
-    :param input_path:
+    :param input_path: can accept both a file and a folder
     :param batch_size:
-    :param shuffle_buffer:
+    :param shuffle_buffer: if None, don't shuffle
     :return:
     """
     if os.path.isdir(input_path):

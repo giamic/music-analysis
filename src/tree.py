@@ -18,6 +18,7 @@ def _create_dm_file(dm, output_folder):
 
 def _create_metadata(ids, times, annotations, output_folder):
     names = ["index", "CrossComp-ID", "ClipTime"]
+    # np.savetxt(os.path.join(output_folder, 'labels.txt'), ids, fmt='%s')
     df = pd.DataFrame(dict(zip(names, [np.arange(len(ids)), ids, times])))
     res = df.merge(annotations, on="CrossComp-ID").sort_values("index").set_index("index")
     res = res[['Composer', 'CrossComp-ID', 'ClipTime', 'CompLifetime', 'SongYear']]

@@ -12,6 +12,8 @@ import os
 from datetime import datetime
 
 import tensorflow as tf
+from tensorflow.python.profiler import option_builder
+from tensorflow.python.profiler.model_analyzer import Profiler
 
 from data_loading import create_tfrecords_iterator
 from models import classify
@@ -33,6 +35,73 @@ try:
 except FileExistsError:
     pass
 
+
+def test_run(sess, writer=None, saver=None):
+    """
+    Run the model on the test database, then write the summaries to disk and save the model.
+    One can cluster the embeddings and use the distance matrix to reconstruct a tree.
+
+    :param sess:
+    :param writer:
+    :param saver: if a tf.train.Saver() is provided, save the model
+    :param clustering:
+    :param tree:
+    :return:
+    """
+    print("step {} of {}, global_step set to {}. Test time!".format(n, steps - 1, global_step))
+    summary, acc = sess.run([merged, accuracy], feed_dict={handle: tst_handle})
+    if writer is not None:
+        writer.add_summary(summary, global_step=global_step)
+    if saver is not None:
+        saver.save(sess, os.path.join(model_folder, "model.ckpt"))
+    return
+
+
+def profiled_run(sess, writer=None, log_step=False, mode='raw_data'):
+    """
+
+    :param sess:
+    :param writer:
+    :param log_step:
+    :param mode: either 'timeline' or 'raw_data'
+    :return:
+    """
+    assert mode == 'timeline' or mode == 'raw_data'
+
+    if log_step:
+        print("step {} of {}, global_step set to {}".format(n, steps - 1, global_step))
+    run_meta = tf.RunMetadata()
+    summary, _ = sess.run([merged, train_step], feed_dict={handle: trn_handle},
+                          options=tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE), run_metadata=run_meta)
+    if writer is not None:
+        writer.add_summary(summary, global_step=global_step)
+    profiler.add_step(n, run_meta)
+
+    if mode == 'raw_data':
+        opts = (option_builder.ProfileOptionBuilder(option_builder.ProfileOptionBuilder.time_and_memory())
+                .with_step(-1)
+                .with_file_output(os.path.join(model_folder, 'profile_time.txt')).build())
+        profiler.profile_operations(options=opts)
+
+    if mode == 'timeline':
+        opts = (option_builder.ProfileOptionBuilder(option_builder.ProfileOptionBuilder.time_and_memory())
+                .with_step(-1)
+                .with_timeline_output(os.path.join(model_folder, 'profile_graph.txt')).build())
+        profiler.profile_graph(options=opts)
+    return
+
+
+def logged_run(sess, writer):
+    summary, _ = sess.run([merged, train_step], feed_dict={handle: trn_handle})
+    writer.add_summary(summary, global_step=global_step)
+    return
+
+
+def training_run(sess):
+    _ = sess.run(train_step, feed_dict={handle: trn_handle})
+    return
+
+
 """ Config """
 params = {
     'bs_test': 1_100,  # batch_size
@@ -53,6 +122,9 @@ params = {
     'n_embeddings': 128,  # number of elements in the final embeddings vector
     'n_composers': 11,  # number of composers in the classification task
     'steps': 300_001,  # number of training steps, one epoch is 354 steps, avoid over-fitting
+    'test_step': 350,
+    'log_step': 19,
+    'profile_step': 95,
     'epsilon': 1e-8  # for numerical stability
 }
 params['steps_per_epoch'] = params['n_train'] / params['bs_train']  # do it outside because I need to call the dict
@@ -88,56 +160,54 @@ with tf.name_scope('summaries') as scope:
     accuracy = tf.reduce_mean(tf.cast(tf.equal(class_predicted, class_true), tf.float32))
     tf.summary.scalar('accuracy', accuracy)
 
-""" Profiler """
-builder = tf.profiler.ProfileOptionBuilder  # Create options to profile the time and memory information.
-opts = builder(builder.time_and_memory()).order_by('micros').build()
-
 """ Session run """
-# Create a profiling context, set constructor argument `trace_steps`, `dump_steps` to empty for explicit control.
-with tf.contrib.tfprof.ProfileContext(os.path.join(model_folder, 'profiler'), trace_steps=[], dump_steps=[]) as pctx:
-    with tf.Session() as sess:
-        for var in tf.trainable_variables():
-            tf.summary.histogram(var.name.replace(":", "_"), var)
-            if "kernel" in var.name and "conv1d" in var.name:
-                tf.summary.image(var.name.replace(":", "_") + "_image", tf.expand_dims(var, -1))
-        merged = tf.summary.merge_all()  # compute all the summaries (why name merge?)
-        train_writer = tf.summary.FileWriter(os.path.join(model_folder, 'train'), sess.graph)
-        test_writer = tf.summary.FileWriter(os.path.join(model_folder, 'test'))
+with tf.Session() as sess:
+    # for var in tf.trainable_variables():
+    #     tf.summary.histogram(var.name.replace(":", "_"), var)
+    #     if "kernel" in var.name and "conv1d" in var.name:
+    #         tf.summary.image(var.name.replace(":", "_") + "_image", tf.expand_dims(var, -1))
+    merged = tf.summary.merge_all()  # compute all the summaries (why name merge?)
+    train_writer = tf.summary.FileWriter(os.path.join(model_folder, 'train'), sess.graph)
+    test_writer = tf.summary.FileWriter(os.path.join(model_folder, 'test'))
 
-        tf.global_variables_initializer().run()
-        tf.local_variables_initializer().run()
-        tf.tables_initializer().run()
-        count_params(tf.trainable_variables(), os.path.join(model_folder, 'params.txt'))
+    tf.global_variables_initializer().run()
+    tf.local_variables_initializer().run()
+    tf.tables_initializer().run()
+    saver = tf.train.Saver()
+    profiler = Profiler(sess.graph)
 
-        saver = tf.train.Saver()
-        try:
-            logger.info("Trying to find a previous model checkpoint.")
-            saver.restore(sess, os.path.join(model_folder, "model.ckpt"))
-            logger.info("Previous model restored")
-        except tf.errors.NotFoundError:
-            logger.warning("No model checkpoint found. Initializing a new model.")
+    try:
+        logger.info("Trying to find a previous model checkpoint.")
+        saver.restore(sess, os.path.join(model_folder, "model.ckpt"))
+        logger.info("Previous model restored")
+    except tf.errors.NotFoundError:
+        logger.warning("No model checkpoint found. Initializing a new model.")
 
-        trn_handle = sess.run(trn_itr.string_handle())
-        tst_handle = sess.run(tst_itr.string_handle())
-        # test = sess.run([x, y_, embeddings, loss, class_predicted, class_true, accuracy], feed_dict={handle: trn_handle})
+    trn_handle = sess.run(trn_itr.string_handle())
+    tst_handle = sess.run(tst_itr.string_handle())
+    # test = sess.run([x, y_, embeddings, loss, class_predicted, class_true, accuracy], feed_dict={handle: trn_handle})
 
-        steps = params['steps']
-        for n in range(steps):
-            # pctx.trace_next_step()  # Enable tracing for next session.run.
-            # pctx.dump_next_step()  # Dump the profile to the folder specified when creating pctx after the step.
-            global_step = sess.run(tf.train.get_global_step())
+    opts = (option_builder.ProfileOptionBuilder(option_builder.ProfileOptionBuilder.trainable_variables_parameter())
+            .with_file_output(os.path.join(model_folder, 'profile_model.txt')).build())
+    profiler.profile_name_scope(options=opts)
+    count_params(tf.trainable_variables(), os.path.join(model_folder, 'params.txt'))
 
-            # if n == 0:  # log the results on the test set and reconstruct the tree
-            if n == steps - 1 or (n > 0 and n % 200 == 0):  # log the results on the test set and reconstruct the tree
-                summary, acc = sess.run([merged, accuracy], feed_dict={handle: tst_handle})
-                # summary, acc, cp = sess.run([merged, accuracy, class_predicted], feed_dict={handle: tst_handle})
-                # print(acc, [p for p in cp])
-                test_writer.add_summary(summary, global_step=global_step)
-                saver.save(sess, os.path.join(model_folder, "model.ckpt"))
-            elif n % 19 == 0:  # train and log
-                print("step {} of {}, global_step set to {}".format(n, steps - 1, global_step))
-                summary, _ = sess.run([merged, train_step], feed_dict={handle: trn_handle})
-                train_writer.add_summary(summary, global_step=global_step)
-            else:  # just train
-                _ = sess.run([train_step], feed_dict={handle: trn_handle})
-            # pctx.profiler.profile_operations(options=opts)
+    steps = params['steps']
+    for n in range(steps):
+        global_step = sess.run(tf.train.get_global_step())
+
+        # if n == 0:  # log the results on the test set and reconstruct the tree
+        if (n > 0 and n % params['test_step'] == 0) or n == steps - 1:
+            test_run(sess, test_writer, saver)
+        elif n > 0 and n % params['profile_step'] == 0:  # train and log
+            profiled_run(sess, train_writer)
+        elif n % params['log_step'] == 0:  # train and log
+            logged_run(sess, train_writer)
+        else:  # just train
+            training_run(sess)
+    # Profiler advice
+    ALL_ADVICE = {'ExpensiveOperationChecker': {},
+                  'AcceleratorUtilizationChecker': {},
+                  'JobChecker': {},  # Only available internally.
+                  'OperationChecker': {}}
+    profiler.advise(ALL_ADVICE)

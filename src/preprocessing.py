@@ -26,6 +26,7 @@ def _create_datapoints_for_dnn(df, T, skip):
 
     :param df: initial data frame of chroma features
     :param T: number of time steps to keep
+    :param skip: take one every skip lines; e.g., if skip=2, take every other line
     :return: expanded data frame of chroma features
     """
     res = df.copy()
@@ -79,9 +80,10 @@ def preprocess(input_folder, output_folder, T, skip, overwrite=False):
     """
     Transform the data from CrossEra database into data that is useful to us.
 
-    :param input_file_paths: a list of the path to all input files
+    :param input_folder: where all the input data is stored
     :param output_folder: where to store the csv we generate
     :param T: the number of time steps to keep
+    :param skip:
     :return:
     """
     original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
