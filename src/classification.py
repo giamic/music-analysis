@@ -16,13 +16,13 @@ from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 
 from data_loading import create_tfrecords_iterator
-from models import classify
+from models import classify, classify_2cl_relu, classify_2cl_sigm
 from utils import count_params, encode_labels
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-model = classify
+model = classify_2cl_sigm
 data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
 train_path = os.path.join(data_folder, 'train', 'chroma_features', 'train.tfrecords')
 test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test.tfrecords')
@@ -114,14 +114,14 @@ params = {
     # 'x.shape': [-1, 1, 1],
     'lr': 0.001,  # learning rate
     'f1': 16,  # number of filters in the 1st layer
-    'f2': 32,
-    'f3': 64,
+    'f2': 24,
+    'f3': 32,
     'k1': 8,  # kernel size of filters in the 1st layer (length of the filter vector)
     'k2': 8,
     'k3': 8,
-    'n_embeddings': 128,  # number of elements in the final embeddings vector
+    'n_embeddings': 64,  # number of elements in the final embeddings vector
     'n_composers': 11,  # number of composers in the classification task
-    'steps': 300_001,  # number of training steps, one epoch is 354 steps, avoid over-fitting
+    'steps': 100_001,  # number of training steps, one epoch is 354 steps, avoid over-fitting
     'test_step': 350,
     'log_step': 19,
     'profile_step': 95,

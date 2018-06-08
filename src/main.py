@@ -17,7 +17,7 @@ from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 
 from data_loading import create_tfrecords_iterator
-from models import three_cl_pool_sigm
+from models import match_3cl_pool_sigm
 from tree import tree_analysis
 from triplet_loss import pairwise_distances, batch_all_triplet_loss
 from utils import clustering_classification, count_params, encode_labels
@@ -25,7 +25,7 @@ from utils import clustering_classification, count_params, encode_labels
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-model = three_cl_pool_sigm
+model = match_3cl_pool_sigm
 data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
 train_path = os.path.join(data_folder, 'train', 'chroma_features', 'train.tfrecords')
 test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test.tfrecords')
