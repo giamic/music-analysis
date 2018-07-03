@@ -26,21 +26,6 @@ def encode_labels(song_id, one_hot):
     return tf.squeeze(y_, 1)
 
 
-def count_params(variables, param_file):
-    """
-    Print number of trainable variables.
-
-    :param variables: as coming from tf.trainable_variables()
-    """
-    n = 0
-    for v in variables:
-        n += np.prod(v.get_shape().as_list())
-    with open(param_file, 'a') as f:
-        f.write("total_parameters: {}".format(n))
-    # print("total_parameters: {}".format(n))
-    return
-
-
 def find_id2cmp(input_path):
     logger = logging.getLogger(__name__)
     logger.info("Constructing the ID to composer look-up table...")

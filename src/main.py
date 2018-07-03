@@ -126,7 +126,6 @@ with tf.Session() as sess:
     opts = (option_builder.ProfileOptionBuilder(option_builder.ProfileOptionBuilder.trainable_variables_parameter())
             .with_file_output(os.path.join(model_folder, 'profile_model.txt')).build())
     profiler.profile_name_scope(options=opts)
-    count_params(tf.trainable_variables(), os.path.join(model_folder, 'params.txt'))
     targets = [embeddings, y_, distance_matrix, song_id, time, loss, positive_triplets]
 
     steps = params['steps']

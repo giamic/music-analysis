@@ -17,7 +17,7 @@ from tensorflow.python.profiler.model_analyzer import Profiler
 
 from data_loading import create_tfrecords_iterator
 from models import classify, classify_2cl_relu, classify_2cl_sigm
-from utils import count_params, encode_labels
+from utils import encode_labels
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -190,7 +190,6 @@ with tf.Session() as sess:
     opts = (option_builder.ProfileOptionBuilder(option_builder.ProfileOptionBuilder.trainable_variables_parameter())
             .with_file_output(os.path.join(model_folder, 'profile_model.txt')).build())
     profiler.profile_name_scope(options=opts)
-    count_params(tf.trainable_variables(), os.path.join(model_folder, 'params.txt'))
 
     steps = params['steps']
     for n in range(steps):
