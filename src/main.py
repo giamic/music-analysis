@@ -17,18 +17,18 @@ from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 
 from data_loading import create_tfrecords_iterator
-from models import match_3cl_pool_sigm
-from tree import tree_analysis
+from models import match_3cl_pool_sigm, match_5cl_pool_sigm
+from runs import test_run, profiled_run, logged_run, training_run
 from triplet_loss import pairwise_distances, batch_all_triplet_loss
-from utils import clustering_classification, count_params, encode_labels
+from utils import count_params, encode_labels
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-model = match_3cl_pool_sigm
+model = match_5cl_pool_sigm
 data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
 train_path = os.path.join(data_folder, 'train', 'chroma_features', 'train.tfrecords')
-test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test.tfrecords')
+test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test_long.tfrecords')
 annotations_path = os.path.join(data_folder, 'cross-composer_annotations.csv')
 model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models',
                             model.__name__ + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
@@ -37,82 +37,6 @@ try:
     os.mkdir(model_folder)
 except FileExistsError:
     pass
-
-
-def test_run(sess, writer=None, saver=None, clustering=True, tree=True):
-    """
-    Run the model on the test database, then write the summaries to disk and save the model.
-    One can cluster the embeddings and use the distance matrix to reconstruct a tree.
-
-    :param sess:
-    :param writer:
-    :param saver: if a tf.train.Saver() is provided, save the model
-    :param clustering:
-    :param tree:
-    :return:
-    """
-    print("step {} of {}, global_step set to {}. Test time!".format(n, steps - 1, global_step))
-    summary, y, labels, dm, ids, times, l, pt = sess.run(
-        [merged, embeddings, y_, distance_matrix, song_id, time, loss, positive_triplets],
-        feed_dict={handle: tst_handle})
-    if writer is not None:
-        writer.add_summary(summary, global_step=global_step)
-    if saver is not None:
-        saver.save(sess, os.path.join(model_folder, "model.ckpt"))
-    if clustering or tree:
-        output_folder = os.path.join(model_folder, 'test', datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
-        os.mkdir(output_folder)
-        if clustering:
-            clustering_classification(labels, y, output_folder)
-        if tree:
-            tree_analysis(dm, ids, times, annotations, output_folder)
-    return
-
-
-def profiled_run(sess, writer=None, log_step=False, mode='raw_data'):
-    """
-
-    :param sess:
-    :param writer:
-    :param log_step:
-    :param mode: either 'timeline' or 'raw_data'
-    :return:
-    """
-    assert mode == 'timeline' or mode == 'raw_data'
-
-    if log_step:
-        print("step {} of {}, global_step set to {}".format(n, steps - 1, global_step))
-    run_meta = tf.RunMetadata()
-    summary, _ = sess.run([merged, train_step], feed_dict={handle: trn_handle},
-                          options=tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE), run_metadata=run_meta)
-    if writer is not None:
-        writer.add_summary(summary, global_step=global_step)
-    profiler.add_step(n, run_meta)
-
-    if mode == 'raw_data':
-        opts = (option_builder.ProfileOptionBuilder(option_builder.ProfileOptionBuilder.time_and_memory())
-                .with_step(-1)
-                .with_file_output(os.path.join(model_folder, 'profile_time.txt')).build())
-        profiler.profile_operations(options=opts)
-
-    if mode == 'timeline':
-        opts = (option_builder.ProfileOptionBuilder(option_builder.ProfileOptionBuilder.time_and_memory())
-                .with_step(-1)
-                .with_timeline_output(os.path.join(model_folder, 'profile_graph.txt')).build())
-        profiler.profile_graph(options=opts)
-    return
-
-
-def logged_run(sess, writer):
-    summary, _ = sess.run([merged, train_step], feed_dict={handle: trn_handle})
-    writer.add_summary(summary, global_step=global_step)
-    return
-
-
-def training_run(sess):
-    _ = sess.run(train_step, feed_dict={handle: trn_handle})
-    return
-
 
 """ Config """
 params = {
@@ -129,12 +53,12 @@ params = {
     'k1': 4,  # kernel size of filters in the 1st layer (length of the filter vector)
     'k2': 4,
     'k3': 4,
-    'n_embeddings': 64,  # number of elements in the final embeddings vector
+    'n_embeddings': 32,  # number of elements in the final embeddings vector
     'n_composers': 11,  # number of composers in the classification task
     'steps': 30_001,  # number of training steps, one epoch is 354 steps, avoid over-fitting
-    'test_step': 350,
-    'log_step': 19,
-    'profile_step': 95
+    'test_step': 1_000,
+    'log_step': 50,
+    'profile_step': -1,
 }
 params['steps_per_epoch'] = params['sb_train'] / params['bs_train']
 
@@ -203,6 +127,7 @@ with tf.Session() as sess:
             .with_file_output(os.path.join(model_folder, 'profile_model.txt')).build())
     profiler.profile_name_scope(options=opts)
     count_params(tf.trainable_variables(), os.path.join(model_folder, 'params.txt'))
+    targets = [embeddings, y_, distance_matrix, song_id, time, loss, positive_triplets]
 
     steps = params['steps']
     for n in range(steps):
@@ -210,13 +135,16 @@ with tf.Session() as sess:
 
         # if n == 0:  # log the results on the test set and reconstruct the tree
         if (n > 0 and n % params['test_step'] == 0) or n == steps - 1:
-            test_run(sess, test_writer, saver)
-        elif n > 0 and n % params['profile_step'] == 0:  # train and log
-            profiled_run(sess, train_writer)
+            print("step {} of {}, global_step set to {}. Test time!".format(n, steps - 1, global_step))
+            test_run(sess, targets, merged, handle, tst_handle, global_step, model_folder, annotations, test_writer, saver, clustering=True, tree=True)
+        elif params['profile_step'] > 0 and n > 0 and n % params['profile_step'] == 0:  # train and log
+            print("step {} of {}, global_step set to {}. Profiling!".format(n, steps - 1, global_step))
+            profiled_run(sess, train_step, merged, handle, trn_handle, global_step, model_folder, profiler, n, train_writer, mode='raw_data')
         elif n % params['log_step'] == 0:  # train and log
-            logged_run(sess, train_writer)
+            print("step {} of {}, global_step set to {}".format(n, steps - 1, global_step))
+            logged_run(sess, train_step, merged, handle, trn_handle, global_step, train_writer)
         else:  # just train
-            training_run(sess)
+            training_run(sess, train_step, handle, trn_handle)
     # Profiler advice
     ALL_ADVICE = {'ExpensiveOperationChecker': {},
                   'AcceleratorUtilizationChecker': {},

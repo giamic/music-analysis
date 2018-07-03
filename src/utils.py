@@ -98,7 +98,7 @@ def create_test_dataset(data_folder, path_output, composers, id2cmp, steps, n_ex
     """
     logger = logging.getLogger(__name__)
     composers = dict(zip(composers, np.ones(len(composers)) * n_songs))
-    file_paths = [data_folder + fp for fp in os.listdir(data_folder)]  # take all the songs
+    file_paths = [os.path.join(data_folder, fp) for fp in os.listdir(data_folder)]  # take all the songs
     shuffle(file_paths)
     original_labels = ['songID', 'time', 'A_t', 'A#_t', 'B_t', 'C_t', 'C#_t', 'D_t', 'D#_t', 'E_t', 'F_t', 'F#_t',
                        'G_t', 'G#_t']
@@ -110,7 +110,7 @@ def create_test_dataset(data_folder, path_output, composers, id2cmp, steps, n_ex
         for n, fp in enumerate(file_paths):
             # logger.info("Working on {}, file {} out of {}".format(fp, n + 1, N))
             with open(fp) as f:
-                id = f.readline()[:13]
+                id = f.readline()[:14]
                 c = id2cmp[id]
             if c in composers and composers[c] > 0:
                 df = pd.read_csv(fp, header=None, names=labels)
@@ -213,8 +213,6 @@ def transform_into_tfrecord(data_path, output_path):
 
 
 if __name__ == '__main__':
-    general_folder = "/home/gianluca/PycharmProjects/music-analysis/data/dataset_audiolabs_crosscomposer/train/chroma_features/"
-    by_song_folder = "/home/gianluca/PycharmProjects/music-analysis/data/dataset_audiolabs_crosscomposer/train/chroma_features/by_song/"
     T = 128  # how many successive steps we want to put in a single row
 
     # composers = [
@@ -230,16 +228,23 @@ if __name__ == '__main__':
     #     'Prokofiew; Sergej',
     #     'Shostakovich; Dmitri',
     # ]
-    #
+
     logging.basicConfig(level=logging.INFO)
+    general_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data',
+                                  'dataset_audiolabs_crosscomposer')
     # preprocess(general_folder, by_song_folder, T)
     # create_random_dataset(by_song_folder, general_folder + 'train2.csv', T, 20)
     # create_random_dataset(by_song_folder, general_folder + 'test.csv', T, 10)
     # create_train_dataset(by_song_folder, general_folder + 'train.csv', T)
-    transform_into_tfrecord(general_folder + 'train.csv', general_folder + 'train.tfrecords')
-    # ids, cmp = find_id2cmp(general_folder + 'cross-era_annotations.csv')
+    # transform_into_tfrecord(general_folder + 'train.csv', general_folder + 'train.tfrecords')
+
+    data_folder = os.path.join(general_folder, 'test', 'chroma_features')
+    by_song_folder = os.path.join(data_folder, 'by_song')
+
+    # ids, cmp, composers = find_id2cmp(os.path.join(general_folder, 'cross-composer_annotations.csv'))
     # id2cmp = dict(zip(ids, cmp))
-    # create_test_dataset(by_song_folder, general_folder + 'test_manual.csv', composers, id2cmp, T)
+    # create_test_dataset(by_song_folder, os.path.join(data_folder, 'test.csv'), composers, id2cmp, T, n_excerpts=2)
+    transform_into_tfrecord(os.path.join(data_folder, 'test.csv'), os.path.join(data_folder, 'test.tfrecords'))
 
     # df = pd.read_csv('/home/gianluca/PycharmProjects/music-analysis/models/model_large_dataset_3/test/50/temp.txt',
     #                  sep='\t', header=None)
@@ -248,6 +253,5 @@ if __name__ == '__main__':
     # res = create_annotations(general_folder, ids, times)
     # pass
 
-    # general_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
     # output_file = os.path.join(general_folder, "song_lengths.csv")
     # store_song_lengths(general_folder, output_file)

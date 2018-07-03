@@ -40,7 +40,7 @@ def match_3cl_bn_pool_relu(input_layer, params):
 
     # Dense Layer
     norm3_flat = tf.reshape(norm3, [-1, 16 * params['f3']])
-    embeddings = tf.layers.dense(inputs=norm3_flat, units=params['n_composers'])
+    embeddings = tf.layers.dense(inputs=norm3_flat, units=params['n_embeddings'])
     return embeddings
 
 
@@ -80,7 +80,59 @@ def match_3cl_pool_sigm(input_layer, params):
 
     # Dense Layer
     flat = tf.reshape(pool3, [-1, 16 * params['f3']])
-    embeddings = tf.layers.dense(inputs=flat, units=params['n_composers'])
+    embeddings = tf.layers.dense(inputs=flat, units=params['n_embeddings'])
+    return embeddings
+
+
+def match_5cl_pool_sigm(input_layer, params):
+    """
+
+    :param input_layer:
+    :param params: a dictionary with number of filters (f1, f2, f3), kernel sizes (k1, k2, k3), and embedding size (n)
+    :return:
+    """
+    # Convolutional Layer #1 and Pooling Layer #1
+    conv1a = tf.layers.conv1d(
+        inputs=input_layer,
+        filters=params['f1'],
+        kernel_size=params['k1'],
+        padding="same",
+        activation=tf.nn.sigmoid)
+    conv1b = tf.layers.conv1d(
+        inputs=conv1a,
+        filters=params['f1'],
+        kernel_size=params['k1'],
+        padding="same",
+        activation=tf.nn.sigmoid)
+    pool1 = tf.layers.max_pooling1d(inputs=conv1b, pool_size=2, strides=2)  # size 64
+
+    # Convolutional Layer #2 and Pooling Layer #2
+    conv2a = tf.layers.conv1d(
+        inputs=pool1,
+        filters=params['f2'],
+        kernel_size=params['k2'],
+        padding="same",
+        activation=tf.nn.sigmoid)
+    conv2b = tf.layers.conv1d(
+        inputs=conv2a,
+        filters=params['f2'],
+        kernel_size=params['k2'],
+        padding="same",
+        activation=tf.nn.sigmoid)
+    pool2 = tf.layers.max_pooling1d(inputs=conv2b, pool_size=2, strides=2)  # size 32
+
+    # Convolutional Layer #3 and Pooling Layer #3
+    conv3 = tf.layers.conv1d(
+        inputs=pool2,
+        filters=params['f3'],
+        kernel_size=params['k3'],
+        padding="same",
+        activation=tf.nn.sigmoid)
+    pool3 = tf.layers.max_pooling1d(inputs=conv3, pool_size=2, strides=2)  # size 16
+
+    # Dense Layer
+    flat = tf.reshape(pool3, [-1, 16 * params['f3']])
+    embeddings = tf.layers.dense(inputs=flat, units=params['n_embeddings'])
     return embeddings
 
 

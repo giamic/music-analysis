@@ -21,7 +21,7 @@ def _create_metadata(ids, times, annotations, output_folder):
     # np.savetxt(os.path.join(output_folder, 'labels.txt'), ids, fmt='%s')
     df = pd.DataFrame(dict(zip(names, [np.arange(len(ids)), ids, times])))
     res = df.merge(annotations, on="CrossComp-ID").sort_values("index").set_index("index")
-    res = res[['Composer', 'CrossComp-ID', 'ClipTime', 'CompLifetime', 'SongYear']]
+    res = res[['Composer', 'CrossComp-ID', 'ClipTime', 'CompBirth', 'CompDeath', 'SongYear']]
     res.to_csv(os.path.join(output_folder, 'metadata.tab'), sep='\t', header=True)
     return
 
