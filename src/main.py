@@ -17,10 +17,10 @@ from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 
 from data_loading import create_tfrecords_iterator
-from models import match_3cl_pool_sigm, match_5cl_pool_sigm
+from models import match_5cl_pool_sigm
 from runs import test_run, profiled_run, logged_run, training_run
 from triplet_loss import pairwise_distances, batch_all_triplet_loss
-from utils import count_params, encode_labels
+from utils import encode_labels
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 model = match_5cl_pool_sigm
 data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
 train_path = os.path.join(data_folder, 'train', 'chroma_features', 'train.tfrecords')
-test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test_long.tfrecords')
+test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test.tfrecords')
 annotations_path = os.path.join(data_folder, 'cross-composer_annotations.csv')
 model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models',
                             model.__name__ + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
