@@ -18,7 +18,7 @@ from tensorflow.python.profiler.model_analyzer import Profiler
 from data_loading import create_tfrecords_iterator
 from models import match_3cl_pool_sigm, match_5cl_pool_sigm, classify_logistic
 from runs import test_run, profiled_run, logged_run, training_run, classifier_run, profiled_test_run
-from triplet_loss import pairwise_distances, batch_all_triplet_loss
+from triplet_loss import pairwise_distances, batch_all_triplet_loss, batch_hard_triplet_loss
 from utils import encode_labels
 
 logging.basicConfig(level=logging.INFO)
@@ -55,7 +55,7 @@ params = {
     'n_embeddings': 32,  # number of elements in the final embeddings vector
     'n_composers': 11,  # number of composers in the classification task
     'steps': 50_001,  # number of training steps, one epoch is 354 steps, avoid over-fitting
-    'test_step': 1,
+    'test_step': 1_000,
     'log_step': 50,
     'profile_step': -1,
 }
@@ -82,13 +82,13 @@ with tf.name_scope("data_input") as scope:
 embeddings = model(input_layer, params)
 
 with tf.name_scope("training") as scope:
-    loss, positive_triplets = batch_all_triplet_loss(labels=y_, embeddings=embeddings, margin=params['loss_margin'])
-    # loss = batch_hard_triplet_loss(labels=y_, embeddings=embeddings, margin=100)
+    # loss, positive_triplets = batch_all_triplet_loss(labels=y_, embeddings=embeddings, margin=params['loss_margin'])
+    loss = batch_hard_triplet_loss(labels=y_, embeddings=embeddings, margin=params['loss_margin'])
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)  # needed for batch normalizations
     with tf.control_dependencies(update_ops):
         train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss, global_step=tf.train.create_global_step())
     tf.summary.scalar('loss', loss)
-    tf.summary.scalar('positive_triplets', positive_triplets)
+    # tf.summary.scalar('positive_triplets', positive_triplets)
 
 """ Creation of the distance matrix for the tree reconstruction """
 with tf.name_scope('summaries') as scope:
