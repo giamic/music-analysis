@@ -160,6 +160,7 @@ with tf.name_scope('summaries') as scope:
     accuracy = tf.reduce_mean(tf.cast(tf.equal(class_predicted, class_true), tf.float32))
     tf.summary.scalar('accuracy', accuracy)
 
+
 """ Session run """
 with tf.Session() as sess:
     # for var in tf.trainable_variables():

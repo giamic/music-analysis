@@ -11,14 +11,13 @@ import logging
 import os
 from datetime import datetime
 
-import pandas as pd
 import tensorflow as tf
 from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 
 from data_loading import create_tfrecords_iterator
-from models import match_5cl_pool_sigm
-from runs import test_run, profiled_run, logged_run, training_run
+from models import match_3cl_pool_sigm, match_5cl_pool_sigm, classify_logistic
+from runs import test_run, profiled_run, logged_run, training_run, classifier_run, profiled_test_run
 from triplet_loss import pairwise_distances, batch_all_triplet_loss
 from utils import encode_labels
 
@@ -28,7 +27,7 @@ logger = logging.getLogger(__name__)
 model = match_5cl_pool_sigm
 data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
 train_path = os.path.join(data_folder, 'train', 'chroma_features', 'train.tfrecords')
-test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test.tfrecords')
+test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test_long.tfrecords')
 annotations_path = os.path.join(data_folder, 'cross-composer_annotations.csv')
 model_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'models',
                             model.__name__ + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
@@ -55,8 +54,8 @@ params = {
     'k3': 4,
     'n_embeddings': 32,  # number of elements in the final embeddings vector
     'n_composers': 11,  # number of composers in the classification task
-    'steps': 30_001,  # number of training steps, one epoch is 354 steps, avoid over-fitting
-    'test_step': 1_000,
+    'steps': 50_001,  # number of training steps, one epoch is 354 steps, avoid over-fitting
+    'test_step': 1,
     'log_step': 50,
     'profile_step': -1,
 }
@@ -65,7 +64,7 @@ params['steps_per_epoch'] = params['sb_train'] / params['bs_train']
 with open(os.path.join(model_folder, 'params.txt'), 'w') as file:
     for (k, v) in params.items():
         file.write("{}: {}\n".format(k, v))
-annotations = pd.read_csv(annotations_path)
+# annotations = pd.read_csv(annotations_path)
 
 """ Data input """
 with tf.name_scope("data_input") as scope:
@@ -96,6 +95,18 @@ with tf.name_scope('summaries') as scope:
     distance_matrix = pairwise_distances(embeddings)
     tf.summary.tensor_summary("distance_matrix", distance_matrix)
 
+""" Classification """
+with tf.name_scope("classify") as scope:
+    predictions = classify_logistic(embeddings, params)
+    y_oh = tf.one_hot(y_, params['n_composers'])
+    cl_loss = tf.losses.softmax_cross_entropy(y_oh, predictions)
+    cl_train_step = tf.train.AdamOptimizer(params['lr']).minimize(cl_loss, var_list=[v for v in tf.trainable_variables() if v.name.startswith("classify")])
+    tf.summary.scalar('classify loss', cl_loss)
+    class_predicted = tf.argmax(predictions, axis=1)
+    class_true = y_
+    accuracy = tf.reduce_mean(tf.cast(tf.equal(class_predicted, class_true), tf.float32))
+    tf.summary.scalar('accuracy', accuracy)
+
 """ Session run """
 with tf.Session() as sess:
     for var in tf.trainable_variables():
@@ -104,6 +115,7 @@ with tf.Session() as sess:
             tf.summary.image(var.name.replace(":", "_") + "_image", tf.expand_dims(var, -1))
     merged = tf.summary.merge_all()  # compute all the summaries (why name merge?)
     train_writer = tf.summary.FileWriter(os.path.join(model_folder, 'train'), sess.graph)
+    classify_writer = tf.summary.FileWriter(os.path.join(model_folder, 'classify'), sess.graph)
     test_writer = tf.summary.FileWriter(os.path.join(model_folder, 'test'))
 
     tf.global_variables_initializer().run()
@@ -126,7 +138,7 @@ with tf.Session() as sess:
     opts = (option_builder.ProfileOptionBuilder(option_builder.ProfileOptionBuilder.trainable_variables_parameter())
             .with_file_output(os.path.join(model_folder, 'profile_model.txt')).build())
     profiler.profile_name_scope(options=opts)
-    targets = [embeddings, y_, distance_matrix, song_id, time, loss, positive_triplets]
+    targets = [embeddings, y_, distance_matrix, song_id, time]
 
     steps = params['steps']
     for n in range(steps):
@@ -135,7 +147,9 @@ with tf.Session() as sess:
         # if n == 0:  # log the results on the test set and reconstruct the tree
         if (n > 0 and n % params['test_step'] == 0) or n == steps - 1:
             print("step {} of {}, global_step set to {}. Test time!".format(n, steps - 1, global_step))
-            test_run(sess, targets, merged, handle, tst_handle, global_step, model_folder, annotations, test_writer, saver, clustering=True, tree=True)
+            # output_folder = test_run(sess, targets, merged, handle, tst_handle, global_step, model_folder, annotations_path, test_writer, saver, clustering=False, tree=True)
+            output_folder = profiled_test_run(sess, targets, merged, handle, tst_handle, global_step, model_folder, annotations_path, profiler, n, test_writer, saver, clustering=False, tree=True)
+            classifier_run(sess, cl_train_step, merged, class_predicted, class_true, handle, trn_handle, tst_handle, global_step, output_folder, writer=classify_writer)
         elif params['profile_step'] > 0 and n > 0 and n % params['profile_step'] == 0:  # train and log
             print("step {} of {}, global_step set to {}. Profiling!".format(n, steps - 1, global_step))
             profiled_run(sess, train_step, merged, handle, trn_handle, global_step, model_folder, profiler, n, train_writer, mode='raw_data')

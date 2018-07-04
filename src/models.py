@@ -239,3 +239,9 @@ def classify_2cl_relu(input_layer, params):
     embeddings = tf.layers.dense(inputs=flat, units=params['n_embeddings'], activation=tf.nn.sigmoid)
     predictions = tf.layers.dense(inputs=embeddings, units=params['n_composers'], activation=tf.nn.softmax)
     return predictions
+
+
+def classify_logistic(embeddings, params):
+
+    predictions = tf.layers.dense(inputs=embeddings, units=params['n_composers'], activation=tf.nn.softmax, name='classify')
+    return predictions
