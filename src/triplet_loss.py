@@ -1,5 +1,6 @@
 # DISCLAIMER : Taken from https://github.com/omoindrot/tensorflow-triplet-loss/blob/master/model/triplet_loss.py
 # see https://omoindrot.github.io/triplet-loss
+import numpy as np
 import tensorflow as tf
 
 
@@ -52,16 +53,13 @@ def _get_anchor_positive_triplet_mask(labels):
         mask: tf.bool `Tensor` with shape [batch_size, batch_size]
     """
     with tf.name_scope("anchor_positive_mask") as scope:
-        # Check that i and j are distinct
-        indices_equal = tf.cast(tf.eye(tf.shape(labels)[0]), tf.bool)
-        indices_not_equal = tf.logical_not(indices_equal)
 
         # Check if labels[i] == labels[j]
         # Uses broadcasting where the 1st argument has shape (1, batch_size) and the 2nd (batch_size, 1)
         labels_equal = tf.equal(tf.expand_dims(labels, 0), tf.expand_dims(labels, 1))
 
-        # Combine the two masks
-        mask = tf.logical_and(indices_not_equal, labels_equal)
+        # Remove the diagonal, that is, the space where a == p
+        mask = tf.matrix_set_diag(labels_equal, tf.zeros(tf.shape(labels)[0], dtype=tf.bool))
 
     return mask
 
@@ -79,6 +77,7 @@ def _get_anchor_negative_triplet_mask(labels):
         # Uses broadcasting where the 1st argument has shape (1, batch_size) and the 2nd (batch_size, 1)
         labels_equal = tf.equal(tf.expand_dims(labels, 0), tf.expand_dims(labels, 1))
 
+        # No need to remove the diagonal, it is already zero
         mask = tf.logical_not(labels_equal)
 
     return mask
@@ -93,13 +92,23 @@ def _get_triplet_mask(labels):
         labels: tf.int32 `Tensor` with shape [batch_size]
     """
     # Check that i, j and k are distinct
-    indices_equal = tf.cast(tf.eye(tf.shape(labels)[0]), tf.bool)
+    indices_equal = tf.eye(tf.shape(labels)[0], dtype=tf.bool)
     indices_not_equal = tf.logical_not(indices_equal)
     i_not_equal_j = tf.expand_dims(indices_not_equal, 2)
     i_not_equal_k = tf.expand_dims(indices_not_equal, 1)
     j_not_equal_k = tf.expand_dims(indices_not_equal, 0)
 
     distinct_indices = tf.logical_and(tf.logical_and(i_not_equal_j, i_not_equal_k), j_not_equal_k)
+
+    # TODO: Finish implementing this
+    # s = tf.shape(labels)[0]
+    # x = np.ones((s, s, s), dtype=bool)
+    # for k in range(s):
+    #     x[k, k, :] = np.zeros(s, dtype=bool)
+    #     x[k, :, k] = np.zeros(s, dtype=bool)
+    #     x[:, k, k] = np.zeros(s, dtype=bool)
+    #
+    # distinct_indices = tf.constant(x)
 
     # Check if labels[i] == labels[j] and labels[i] != labels[k]
     label_equal = tf.equal(tf.expand_dims(labels, 0), tf.expand_dims(labels, 1))
@@ -145,20 +154,28 @@ def batch_all_triplet_loss(labels, embeddings, margin, squared=False):
     # Put to zero the invalid triplets
     # (where label(a) != label(p) or label(n) == label(a) or a == p)
     mask = _get_triplet_mask(labels)
-    mask = tf.to_float(mask)
-    triplet_loss = tf.multiply(mask, triplet_loss)
 
+    """ Old method """
+    # mask = tf.to_float(mask)
+    # triplet_loss = tf.multiply(mask, triplet_loss)
+    # # Remove negative losses (i.e. the easy triplets)
+    # triplet_loss = tf.maximum(triplet_loss, 0.0)
+    # # Count number of positive triplets (where triplet_loss > 0)
+    # positive_triplets = tf.to_float(tf.greater(triplet_loss, 1e-16))
+    # num_positive_triplets = tf.reduce_sum(positive_triplets)
+    # num_valid_triplets = tf.reduce_sum(mask)
+
+    """ New method """
+    triplet_loss = tf.boolean_mask(triplet_loss, mask)  # Now triplet_loss is a 1D flattened tensor
     # Remove negative losses (i.e. the easy triplets)
     triplet_loss = tf.maximum(triplet_loss, 0.0)
-
     # Count number of positive triplets (where triplet_loss > 0)
-    valid_triplets = tf.to_float(tf.greater(triplet_loss, 1e-16))
-    num_positive_triplets = tf.reduce_sum(valid_triplets)
-    num_valid_triplets = tf.reduce_sum(mask)
-    fraction_positive_triplets = num_positive_triplets / (num_valid_triplets + 1e-16)
+    num_positive_triplets = tf.to_float(tf.count_nonzero(tf.greater(triplet_loss, 1e-16)))
+    num_valid_triplets = tf.to_float(tf.reduce_prod(tf.shape(triplet_loss)))
 
-    # Get final mean triplet loss over the positive valid triplets
+    # Get final mean triplet loss over the positive valid triplets and fraction of positive triplets
     triplet_loss = tf.reduce_sum(triplet_loss) / (num_positive_triplets + 1e-16)
+    fraction_positive_triplets = num_positive_triplets / (num_valid_triplets + 1e-16)
 
     return triplet_loss, fraction_positive_triplets
 

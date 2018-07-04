@@ -122,9 +122,9 @@ params = {
     'n_embeddings': 64,  # number of elements in the final embeddings vector
     'n_composers': 11,  # number of composers in the classification task
     'steps': 100_001,  # number of training steps, one epoch is 354 steps, avoid over-fitting
-    'test_step': 350,
-    'log_step': 19,
-    'profile_step': 95,
+    'test_step': 1_000,
+    'log_step': 50,
+    'profile_step': 200_000,
     'epsilon': 1e-8  # for numerical stability
 }
 params['steps_per_epoch'] = params['n_train'] / params['bs_train']  # do it outside because I need to call the dict
