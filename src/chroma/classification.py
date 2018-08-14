@@ -15,9 +15,9 @@ import tensorflow as tf
 from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 
-from data_loading import create_tfrecords_iterator
-from models import classify, classify_2cl_relu, classify_2cl_sigm
-from utils import encode_labels
+from chroma.data_loading import create_tfrecords_iterator
+from models import classify_2cl_sigm
+from chroma.utils import encode_labels
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

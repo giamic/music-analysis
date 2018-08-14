@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow.python.profiler import option_builder
 
 from tree import tree_analysis
-from utils import clustering_classification
+from chroma.utils import clustering_classification
 
 
 def test_run(sess, targets, merged_summary, handle, h, global_step, model_folder, annotations_file, writer=None,

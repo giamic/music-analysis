@@ -15,17 +15,17 @@ import tensorflow as tf
 from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 
-from data_loading import create_tfrecords_iterator
-from models import match_3cl_pool_sigm, match_5cl_pool_sigm, classify_logistic
-from runs import test_run, profiled_run, logged_run, training_run, classifier_run, profiled_test_run
-from triplet_loss import pairwise_distances, batch_all_triplet_loss, batch_hard_triplet_loss
-from utils import encode_labels
+from chroma.data_loading import create_tfrecords_iterator
+from models import match_5cl_pool_sigm, classify_logistic
+from chroma.runs import profiled_run, logged_run, training_run, classifier_run, profiled_test_run
+from triplet_loss import pairwise_distances, batch_hard_triplet_loss
+from chroma.utils import encode_labels
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 model = match_5cl_pool_sigm
-data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'dataset_audiolabs_crosscomposer')
+data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', '..', 'data', 'dataset_audiolabs_crosscomposer')
 train_path = os.path.join(data_folder, 'train', 'chroma_features', 'train.tfrecords')
 test_path = os.path.join(data_folder, 'test', 'chroma_features', 'test_long.tfrecords')
 annotations_path = os.path.join(data_folder, 'cross-composer_annotations.csv')
