@@ -1,5 +1,52 @@
+import numpy as np
 import tensorflow as tf
 from tensorflow.contrib import rnn
+
+
+def classify_3c2_rnn_bn_pool_sigmoid(input_layer, params):
+    """
+
+    :param input_layer:
+    :param params: a dictionary with number of filters (fi), kernel sizes (ki_f, ki_t), and embedding size (n)
+    :return:
+    """
+    # Convolutional Layer #1 and Pooling Layer #1
+    conv1 = tf.layers.conv2d(
+        inputs=input_layer,  # Dimension of input_layer = (-1, 233, 441, 1)
+        filters=params['f1'],
+        kernel_size=(params['k1_f'], params['k1_t']),
+        padding="same",
+        activation=tf.nn.sigmoid)
+    pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=(2, 4), strides=(2, 4), padding='same')  # shape (-1, 117, 111, 8)
+    norm1 = tf.layers.batch_normalization(inputs=pool1)
+
+    # Convolutional Layer #2 and Pooling Layer #2
+    conv2 = tf.layers.conv2d(
+        inputs=norm1,
+        filters=params['f2'],
+        kernel_size=(params['k2_f'], params['k2_t']),
+        padding="same",
+        activation=tf.nn.sigmoid)
+    pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=(2, 4), strides=(2, 4), padding='same')  # shape (-1, 59, 28, 8)
+    norm2 = tf.layers.batch_normalization(inputs=pool2)
+
+    # Convolutional Layer #3 and Pooling Layer #3
+    conv3 = tf.layers.conv2d(
+        inputs=norm2,
+        filters=params['f3'],
+        kernel_size=(params['k3_f'], params['k3_t']),
+        padding="same",
+        activation=tf.nn.sigmoid)
+    pool3 = tf.layers.max_pooling2d(inputs=conv3, pool_size=(2, 4), strides=(2, 4), padding='same')  # shape (-1, 30, 7, 16)
+    norm3 = tf.layers.batch_normalization(inputs=pool3)
+
+    temp = tf.reshape(tf.transpose(norm3, [0, 2, 1, 3]), [-1, 7, 480])
+    embeddings = tf.reshape(temp, [-1, 7*480])
+    rnn_input = tf.unstack(temp, 7, 1)
+    lstm_cell = rnn.BasicLSTMCell(params['n_composers'], forget_bias=1.0)
+    outputs, state = rnn.static_rnn(lstm_cell, rnn_input, dtype=tf.float32)
+    logits = outputs[-1]
+    return logits, embeddings
 
 
 def classify_4c2_bn_pool_sigmoid(input_layer, params):
@@ -9,10 +56,9 @@ def classify_4c2_bn_pool_sigmoid(input_layer, params):
     :param params: a dictionary with number of filters (fi), kernel sizes (ki_f, ki_t), and embedding size (n)
     :return:
     """
-    # Dimension of input_layer = (-1, 233, 1764, 1)
     # Convolutional Layer #1 and Pooling Layer #1
     conv1 = tf.layers.conv2d(
-        inputs=input_layer,
+        inputs=input_layer,  # Dimension of input_layer = (-1, 233, 441, 1)
         filters=params['f1'],
         kernel_size=(params['k1_f'], params['k1_t']),
         padding="same",
@@ -50,31 +96,11 @@ def classify_4c2_bn_pool_sigmoid(input_layer, params):
     pool4 = tf.layers.max_pooling2d(inputs=conv4, pool_size=(2, 4), strides=(2, 4), padding='same')  # shape (-1, 15, 2, 16)
     norm4 = tf.layers.batch_normalization(inputs=pool4)
 
-    # rnn_input = tf.unstack(norm3, 28, 2)
-    # lstm_cell = rnn.BasicLSTMCell(params['n_rnn'], forget_bias=1.0)
-    # outputs, states = rnn.static_rnn(lstm_cell, x, dtype=tf.float32)
-    #
-    # def RNN(x, weights, biases):
-    #     # Prepare data shape to match `rnn` function requirements
-    #     # Current data input shape: (batch_size, timesteps, n_input)
-    #     # Required shape: 'timesteps' tensors list of shape (batch_size, n_input)
-    #
-    #     # Unstack to get a list of 'timesteps' tensors of shape (batch_size, n_input)
-    #     x = tf.unstack(x, timesteps, 1)
-    #
-    #     # Define a lstm cell with tensorflow
-    #     lstm_cell = rnn.BasicLSTMCell(num_hidden, forget_bias=1.0)
-    #
-    #     # Get lstm cell output
-    #     outputs, states = rnn.static_rnn(lstm_cell, x, dtype=tf.float32)
-    #
-    #     # Linear activation, using rnn inner loop last output
-    #     return tf.matmul(outputs[-1], weights['out']) + biases['out']
     # Dense Layer
     flat = tf.reshape(norm4, [-1, 15 * 2 * params['f4']])
     embeddings = tf.layers.dense(inputs=flat, units=params['n_embeddings'], activation=tf.nn.sigmoid)
-    predictions = tf.layers.dense(inputs=embeddings, units=params['n_composers'], activation=tf.nn.softmax)
-    return predictions
+    logits = tf.layers.dense(inputs=embeddings, units=params['n_composers'])
+    return logits
 
 
 def match_3cl_bn_pool_relu(input_layer, params):

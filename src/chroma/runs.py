@@ -4,7 +4,7 @@ from datetime import datetime
 import tensorflow as tf
 from tensorflow.python.profiler import option_builder
 
-from tree import tree_analysis
+from chroma.tree import tree_analysis
 from chroma.utils import clustering_classification
 
 

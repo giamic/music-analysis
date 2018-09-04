@@ -1,11 +1,7 @@
 import os
-from datetime import datetime
 
 import tensorflow as tf
 from tensorflow.python.profiler import option_builder
-
-from tree import tree_analysis
-from chroma.utils import clustering_classification
 
 
 def test_run(sess, targets, merged, handle, h, global_step, model_folder, writer=None, saver=None):
