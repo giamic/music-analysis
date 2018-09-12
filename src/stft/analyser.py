@@ -14,7 +14,7 @@ clip_time = 20
 frequency_cap = 5_000
 np.random.seed(18)
 
-test = True
+test = False
 
 if test:
     audio_file = 'audio.flac'
@@ -43,7 +43,9 @@ else:
             audio_file = os.path.join(data_folder, a, r)
             samples, sample_rate = sf.read(audio_file)
             samples = np.average(samples, axis=1)  # magically transform the file to mono
-            f1, t1, v1 = np.abs(stft(samples, sample_rate, window='blackman', nperseg=1000, nfft=2048))
+            f1, t1, v1 = np.abs(stft(samples, sample_rate, window='hamming', nperseg=2001, nfft=2048))
+            # frequency resolution = fs * window_main_lobe_size / nperseg = 44100 Hz * 4 / 2001 = 88 Hz
+            # time resolution = nperseg / fs = 2001 / 44100 Hz = 0.045 s = 45 ms
             f_end = np.searchsorted(f1, frequency_cap)
             clip_size = int(clip_time / (t1[1] - t1[0]))
             n_clips = int(t1[-1] / clip_time)

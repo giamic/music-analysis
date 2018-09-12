@@ -84,6 +84,8 @@ with tf.name_scope("data_input") as scope:
     temp = tf.reshape(x, params['x.shape'])  # shape [-1, 233, 1_764, 1]
     input_layer = tf.layers.max_pooling2d(inputs=temp, pool_size=(1, 4), strides=(1, 4),
                                           padding='same')  # shape (-1, 233, 441, 1)
+    # Are we sure we need this pooling at the beginning?
+
     y_ = tf.one_hot(comp_id, 6)
     y_ = tf.squeeze(y_, 1)  # squeeze because tf.graph doesn't know that there is only one songID per data point
 

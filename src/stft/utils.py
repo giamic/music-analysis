@@ -46,6 +46,6 @@ def transform_into_tfrecord(data_path, output_path):
 
 if __name__ == '__main__':
     data_folder = os.path.join(os.path.curdir, '..', '..', 'data', 'images')
-    # train_validation_split(data_folder)
-    # transform_into_tfrecord(os.path.join(data_folder, 'train'), os.path.join(data_folder, 'train.tfrecords'))
-    # transform_into_tfrecord(os.path.join(data_folder, 'validation'), os.path.join(data_folder, 'validation.tfrecords'))
+    train_validation_split(data_folder)
+    transform_into_tfrecord(os.path.join(data_folder, 'train'), os.path.join(data_folder, 'train.tfrecords'))
+    transform_into_tfrecord(os.path.join(data_folder, 'validation'), os.path.join(data_folder, 'validation.tfrecords'))
