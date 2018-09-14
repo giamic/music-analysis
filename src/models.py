@@ -12,12 +12,12 @@ def classify_3c2_rnn_bn_pool_sigmoid(input_layer, params):
     """
     # Convolutional Layer #1 and Pooling Layer #1
     conv1 = tf.layers.conv2d(
-        inputs=input_layer,  # Dimension of input_layer = (-1, 233, 441, 1)
+        inputs=input_layer,  # Dimension of input_layer = (-1, 233, 883, 1)
         filters=params['f1'],
         kernel_size=(params['k1_f'], params['k1_t']),
         padding="same",
         activation=tf.nn.sigmoid)
-    pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=(2, 4), strides=(2, 4), padding='same')  # shape (-1, 117, 111, 8)
+    pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=(2, 4), strides=(2, 4), padding='same')  # shape (-1, 117, 221, 8)
     norm1 = tf.layers.batch_normalization(inputs=pool1)
 
     # Convolutional Layer #2 and Pooling Layer #2
@@ -27,7 +27,7 @@ def classify_3c2_rnn_bn_pool_sigmoid(input_layer, params):
         kernel_size=(params['k2_f'], params['k2_t']),
         padding="same",
         activation=tf.nn.sigmoid)
-    pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=(2, 4), strides=(2, 4), padding='same')  # shape (-1, 59, 28, 8)
+    pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=(2, 4), strides=(2, 4), padding='same')  # shape (-1, 59, 56, 8)
     norm2 = tf.layers.batch_normalization(inputs=pool2)
 
     # Convolutional Layer #3 and Pooling Layer #3
@@ -37,12 +37,13 @@ def classify_3c2_rnn_bn_pool_sigmoid(input_layer, params):
         kernel_size=(params['k3_f'], params['k3_t']),
         padding="same",
         activation=tf.nn.sigmoid)
-    pool3 = tf.layers.max_pooling2d(inputs=conv3, pool_size=(2, 4), strides=(2, 4), padding='same')  # shape (-1, 30, 7, 16)
+    pool3 = tf.layers.max_pooling2d(inputs=conv3, pool_size=(2, 4), strides=(2, 4), padding='same')  # shape (-1, 30, 14, 16)
     norm3 = tf.layers.batch_normalization(inputs=pool3)
 
-    temp = tf.reshape(tf.transpose(norm3, [0, 2, 1, 3]), [-1, 7, 480])
-    embeddings = tf.reshape(temp, [-1, 7*480])
-    rnn_input = tf.unstack(temp, 7, 1)
+    # TODO: make this reshape automatic, without having to hard-code the dimensions.
+    temp = tf.reshape(tf.transpose(norm3, [0, 2, 1, 3]), [-1, 14, 480])
+    embeddings = tf.reshape(temp, [-1, 14*480])
+    rnn_input = tf.unstack(temp, 14, 1)
     lstm_cell = rnn.BasicLSTMCell(params['n_composers'], forget_bias=1.0)
     outputs, state = rnn.static_rnn(lstm_cell, rnn_input, dtype=tf.float32)
     logits = outputs[-1]

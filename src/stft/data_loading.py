@@ -10,16 +10,18 @@ import tensorflow as tf
 def _parse_function(proto):
     f = {
         "composer_id": tf.FixedLenSequenceFeature([], tf.int64, default_value=0, allow_missing=True),
+        "recording_id": tf.FixedLenSequenceFeature([], tf.int64, default_value=0, allow_missing=True),
         "song_id": tf.FixedLenSequenceFeature([], tf.int64, default_value=0, allow_missing=True),
         "time": tf.FixedLenSequenceFeature([], tf.int64, default_value=0, allow_missing=True),
         "x": tf.FixedLenSequenceFeature([], tf.int64, default_value=0, allow_missing=True)
     }
     parsed_features = tf.parse_single_example(proto, f)
     comp_id = parsed_features["composer_id"]
+    reco_id = parsed_features["recording_id"]
     song_id = parsed_features["song_id"]
     time = parsed_features["time"]
     x = tf.cast(parsed_features["x"], tf.float32)
-    return x, comp_id, song_id, time
+    return x, comp_id, reco_id, song_id, time
 
 
 def create_tfrecords_iterator(input_path, batch_size, shuffle_buffer):

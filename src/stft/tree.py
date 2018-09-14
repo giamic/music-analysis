@@ -15,8 +15,9 @@ def _create_dm_file(dm, matrix_fp):
 
 
 def _create_metadata(ids, times, md_file):
-    names = ["index", "CompID_SongID", "ClipTime"]
-    df = pd.DataFrame(dict(zip(names, [np.arange(len(ids)), ids, times])))
+    names = ["index", "ID", "Composer", "ClipTime"]
+    comp = [i.split('_')[0] for i in ids]
+    df = pd.DataFrame(dict(zip(names, [np.arange(len(ids)), ids, comp, times])))
     # annotations = pd.read_csv(annotations_file, header=0)
     # res = df.merge(annotations, on="CrossComp-ID").sort_values("index").set_index("index")
     # res = res[['Composer', 'CrossComp-ID', 'ClipTime', 'CompBirth', 'CompDeath', 'SongYear']]
@@ -78,8 +79,8 @@ def _visualize_tree(tree, metadata, html, map):
     return html, map
 
 
-def tree_analysis(dm, comp_ids, song_ids, times, output_folder):
-    ids = [str(c[0]) + '_' + str(s[0]) for c, s in zip(comp_ids, song_ids)]
+def tree_analysis(dm, comp_ids, reco_ids, song_ids, times, output_folder):
+    ids = [str(c[0]) + '_' + str(r[0]) + '_' + str(s[0]) for c, r, s in zip(comp_ids, reco_ids, song_ids)]
     times = list(map(lambda x: x[0], times))
     try:
         os.mkdir(output_folder)
@@ -90,29 +91,30 @@ def tree_analysis(dm, comp_ids, song_ids, times, output_folder):
     _create_dm_file(dm, matrix_file)
     metadata_file = os.path.join(output_folder, 'metadata.tab')
     _create_metadata(ids, times, metadata_file)
-    tree_file = os.path.join(output_folder, 'tree.nwk')
-    info_file = os.path.join(output_folder, 'fastME.info')
-    _reconstruct_tree(matrix_file, tree_file, info_file)
-    # dated_tree_file = os.path.join(output_folder, 'tree.dated.nwk')
-    # _date_tree(tree_file, annotations_file, dated_tree_file)
-    html = os.path.join(output_folder, 'tree.html')
-    html_compressed = os.path.join(output_folder, 'map.html')
-    _visualize_tree(tree_file, metadata_file, html, html_compressed)
+    # tree_file = os.path.join(output_folder, 'tree.nwk')
+    # info_file = os.path.join(output_folder, 'fastME.info')
+    # _reconstruct_tree(matrix_file, tree_file, info_file)
+    # # dated_tree_file = os.path.join(output_folder, 'tree.dated.nwk')
+    # # _date_tree(tree_file, annotations_file, dated_tree_file)
+    # html = os.path.join(output_folder, 'tree.html')
+    # html_compressed = os.path.join(output_folder, 'map.html')
+    # _visualize_tree(tree_file, metadata_file, html, html_compressed)
     return
 
 
-if __name__ == '__main__':
-    data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data',
-                               'dataset_audiolabs_crosscomposer')
-    annotations = os.path.join(data_folder, 'cross-composer_annotations.csv')
-    output_folder = '/home/gianluca/PycharmProjects/music-analysis/models/match_5cl_pool_sigm_2018-07-03_18-35-52/test/2018-07-03_22-08-51'
-    tree_file = os.path.join(output_folder, 'tree.nwk')
-    metadata_file = os.path.join(output_folder, 'metadata.tab')
-    dated_tree_file = os.path.join(output_folder, 'tree.dated.nwk')
-    _date_tree(tree_file, annotations, dated_tree_file)
-    html = os.path.join(output_folder, 'tree.html')
-    map = os.path.join(output_folder, 'map.html')
-    _visualize_tree(tree_file, metadata_file, html, map)
+# if __name__ == '__main__':
+#     data_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data',
+#                                'dataset_audiolabs_crosscomposer')
+#     annotations = os.path.join(data_folder, 'cross-composer_annotations.csv')
+#     output_folder = '/home/gianluca/PycharmProjects/music-analysis/models/match_5cl_pool_sigm_2018-07-03_18-35-52/test/2018-07-03_22-08-51'
+#     tree_file = os.path.join(output_folder, 'tree.nwk')
+#     metadata_file = os.path.join(output_folder, 'metadata.tab')
+#     dated_tree_file = os.path.join(output_folder, 'tree.dated.nwk')
+#
+#     _date_tree(tree_file, annotations, dated_tree_file)
+#     html = os.path.join(output_folder, 'tree.html')
+#     map = os.path.join(output_folder, 'map.html')
+#     _visualize_tree(tree_file, metadata_file, html, map)
 
 # /home/gianluca/PycharmProjects/music-analysis/models/match_5cl_pool_sigm_2018-07-03_18-35-52/test/2018-07-03_22-08-51/tree.dated.nwk.metadata.tab
 # /data//home/gianluca/PycharmProjects/music-analysis/models/match_5cl_pool_sigm_2018-07-03_18-35-52/test/2018-07-03_22-08-51/tree.dated.nwk.metadata.tab

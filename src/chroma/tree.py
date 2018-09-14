@@ -43,13 +43,13 @@ def _reconstruct_tree(matrix, tree, info=None):
 def _date_tree(tree, annotations_file, dated_tree_file=None):
     dates = '{}.dates.tab'.format(tree)
     df = pd.read_csv(annotations_file, header=0)
-    df.index = df['CrossComp-ID']
+    df.index = df['CrossComp-ID'].map(lambda x: x[10:])
     df = df[['SongYear', 'CompBirth', 'CompDeath']]
     df['date'] = df.apply(lambda row: row['SongYear'] if not pd.isnull(row['SongYear']) \
         else 'b({},{})'.format(row['CompBirth'], row['CompDeath']), axis=1)
     with open(dates, 'w+') as f:
         f.write('{}\n'.format(len(df)))
-    df['date'].to_csv(dates, header=False, index=True, mode='a')
+    df['date'].to_csv(dates, header=False, index=True, mode='a', sep=' ')
     call(["lsd", "-i", tree, "-d", dates, "-v", "2", "-c", "-r", "a"])
     if dated_tree_file:
         call(['mv', '{}.result.date.newick'.format(tree), dated_tree_file])
@@ -111,6 +111,3 @@ if __name__ == '__main__':
     html = os.path.join(output_folder, 'tree.html')
     map = os.path.join(output_folder, 'map.html')
     _visualize_tree(dated_tree_file, metadata_file, html, map)
-
-# /home/gianluca/PycharmProjects/music-analysis/models/match_5cl_pool_sigm_2018-07-03_18-35-52/test/2018-07-03_22-08-51/tree.dated.nwk.metadata.tab
-# /data//home/gianluca/PycharmProjects/music-analysis/models/match_5cl_pool_sigm_2018-07-03_18-35-52/test/2018-07-03_22-08-51/tree.dated.nwk.metadata.tab
