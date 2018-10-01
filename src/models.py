@@ -42,12 +42,12 @@ def classify_3c2_rnn_bn_pool_sigmoid(input_layer, params):
 
     # TODO: make this reshape automatic, without having to hard-code the dimensions.
     temp = tf.reshape(tf.transpose(norm3, [0, 2, 1, 3]), [-1, 14, 480])
-    embeddings = tf.reshape(temp, [-1, 14*480])
+    # embeddings = tf.reshape(temp, [-1, 14*480])
     rnn_input = tf.unstack(temp, 14, 1)
-    lstm_cell = rnn.BasicLSTMCell(params['n_composers'], forget_bias=1.0)
-    outputs, state = rnn.static_rnn(lstm_cell, rnn_input, dtype=tf.float32)
-    logits = outputs[-1]
-    return logits, embeddings
+    lstm_cell = rnn.BasicLSTMCell(params['n_embeddings'], forget_bias=1.0)
+    embeddings, state = rnn.static_rnn(lstm_cell, rnn_input, dtype=tf.float32)
+    logits = tf.layers.dense(inputs=embeddings[-1], units=params['n_composers'])
+    return logits, embeddings[-1]
 
 
 def classify_4c2_bn_pool_sigmoid(input_layer, params):
