@@ -25,7 +25,6 @@ def transform_into_tfrecord(data_path, output_path):
                 continue
             x = rgb2gray(rgba2rgb(x))
             x = (x * 256).astype(np.uint8).flatten()
-            # x = x[:233*1323]
             assert len(x) == 308259
             temp = fn.split('_')
             composer_id, song_id = int(temp[1]), int(temp[2])
@@ -38,7 +37,7 @@ def transform_into_tfrecord(data_path, output_path):
     return
 
 
-def train_validation_split(data_folder, n_composers=None, mode='previews'):
+def train_validation_split(data_folder):
     images = os.listdir(data_folder)
     images = [i for i in images if i[-4:] == '.png']  # remove directories and other files and keep only the images
 
@@ -46,30 +45,12 @@ def train_validation_split(data_folder, n_composers=None, mode='previews'):
         print("No data available for splitting, I'm leaving.")
         return
 
-    if mode == 'previews':
-        for i in images:
-            if np.random.random() > 0.9:
-                os.rename(os.path.join(data_folder, i), os.path.join(data_folder, 'validation', i))
-            else:
-                os.rename(os.path.join(data_folder, i), os.path.join(data_folder, 'train', i))
+    for i in images:
+        if np.random.random() > 0.9:
+            os.rename(os.path.join(data_folder, i), os.path.join(data_folder, 'validation', i))
+        else:
+            os.rename(os.path.join(data_folder, i), os.path.join(data_folder, 'train', i))
 
-    elif mode == 'tracks':
-        if n_composers is None:
-            raise ValueError("You specified mode==tracks but didn't give pass n_composers")
-        for n in range(n_composers):
-            im = [i for i in images if i.split('_')[1] == str(n)]
-            recs = set([i.split('_')[2] for i in im])
-            for r in recs:
-                im_r = [i for i in im if i.split('_')[2] == r]
-                songs = set([i.split('_')[3] for i in im_r])
-                for s in songs:
-                    im_rs = [i for i in im_r if i.split('_')[3] == s]
-                    if np.random.random() > 0.9:
-                        for i in im_rs:
-                            os.rename(os.path.join(data_folder, i), os.path.join(data_folder, 'validation', i))
-                    else:
-                        for i in im_rs:
-                            os.rename(os.path.join(data_folder, i), os.path.join(data_folder, 'train', i))
     return
 
 

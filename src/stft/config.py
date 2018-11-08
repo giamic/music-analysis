@@ -12,7 +12,6 @@ MODELS_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', '
 SR = 44100  # the sampling rate
 N_FFT = 2048  # the size of the FFT
 FRAME_SIZE = 2001  # how many samples per frame of the STFT analysis
-CLIP_TIME = 30  # duration of a clip
 FREQUENCY_CAP = 5000  # in Hz, throw away the part of the spectrogram above to save memory and improve speed
 
 # CLASSIFICATION PARAMETERS
