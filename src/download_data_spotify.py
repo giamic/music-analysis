@@ -1,32 +1,71 @@
+import csv
 import json
+import logging
 import os
 from urllib.request import urlretrieve
-import logging
 
-import requests
+from oauthlib.oauth2 import BackendApplicationClient
+from requests.auth import HTTPBasicAuth
+from requests_oauthlib import OAuth2Session
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+CREDENTIALS_FILE = os.path.join('..', 'data', 'spotify_credentials.csv')
+with open(CREDENTIALS_FILE) as f:
+    csvfile = csv.reader(f)
+    _, client_id = next(csvfile)
+    _, client_secret = next(csvfile)
+
+auth = HTTPBasicAuth(client_id, client_secret)
+client = BackendApplicationClient(client_id=client_id)
+oauth = OAuth2Session(client=client)
+token = oauth.fetch_token(token_url='https://accounts.spotify.com/api/token', auth=auth)
+
+
+def create_filename(track_name, counter):
+    track_name = track_name. \
+        replace('/', ''). \
+        replace(';', ''). \
+        replace(':', ''). \
+        replace('*', ''). \
+        replace('=', ''). \
+        replace('(', ''). \
+        replace(')', ''). \
+        replace('[', ''). \
+        replace(']', ''). \
+        replace('?', ''). \
+        replace('!', ''). \
+        replace(' ', '_'). \
+        replace("'", '-'). \
+        replace("`", '-'). \
+        replace('"', '-'). \
+        replace('&', 'and')
+
+    name = str(counter).zfill(6) + '_' + track_name + '.mp3'
+    return name
+
 
 def download_files(query, folder, counter):
-    response = json.loads(requests.get(query).text)
+    response = json.loads(oauth.get(query).text)
     next_query = response['next'] if 'next' in response else None
     for album in response['items']:
-        logger.info("Working on album {}, {} previews processed so far".format(album['title'], counter))
+        logger.info("Working on album {}, {} previews processed so far".format(album['name'], counter))
         tracklist_query = 'https://api.spotify.com/v1/albums/{}/tracks'.format(album['id'])
         while tracklist_query is not None:
-            tracklist = json.loads(requests.get(tracklist_query).text)
+            tracklist = json.loads(oauth.get(tracklist_query).text)
             for t in tracklist['items']:
-                local_path = os.path.join(folder, str(counter).zfill(6) + '_' + t['name'].replace('/', '_'))
-                urlretrieve(t['preview_url'], local_path)
-                counter += 1
+                if t['preview_url'] is not None:
+                    file_name = create_filename(t['name'], counter)
+                    local_path = os.path.join(folder, file_name)
+                    urlretrieve(t['preview_url'], local_path)
+                    counter += 1
             tracklist_query = tracklist['next'] if 'next' in tracklist else None
     return next_query, counter
 
 
 n_loops = 1000
-limit = 100000
+n_previews = 3000
 c2id = {
     'Johann Sebastian Bach': '5aIqB5nVVvmFsvSdExz408',
     'Ludwig van Beethoven': '2wOqMjp9TyABvtHdOSOTUS',
@@ -44,28 +83,26 @@ c2id = {
     'Sergei Rachmaninov': '0Kekt6CKSo0m5mivKcoH51'
 }
 
-composers = sorted(c2id.keys())
+composers = ['Claude Debussy']
+# composers = sorted(c2id.keys())
 output_folders = [
-    os.path.join(os.path.abspath(os.sep), 'media', 'giamic', 'Local Disk', 'music-analysis', 'data', 'spotify_previews',
-                 str(i).zfill(3) + '_' + c) for i, c in enumerate(composers)]
+    os.path.join(os.path.abspath(os.sep), 'media', 'giamic', 'Local Disk', 'music_analysis', 'data', 'spotify_previews',
+                 'recordings', str(i).zfill(3) + '_' + c) for i, c in enumerate(composers)]
 for of in output_folders:
     try:
         os.makedirs(of)
     except FileExistsError:
-        # logger.warning("Couldn't create the folders")
         pass
 
 for c, of in zip(composers, output_folders):
     logger.info("Working on {}".format(c))
     logger.info("Output folder is {}".format(of))
-    counter, loop = 0, 0
+    counter = 0
 
     query = 'https://api.spotify.com/v1/artists/{}/albums'.format(c2id[c])
-    while query is not None and loop < n_loops:
-        # query = 'https://api.deezer.com/search/track?q=artist:"{}"&index={}'.format(c, counter)
-        logger.info("Asking query {}, so far {} elements processed, loop {}".format(query, counter, loop))
+    while query is not None and counter < n_previews:
+        logger.info("Asking query {}, so far {} elements processed".format(query, counter))
         query, counter = download_files(query, of, counter)
-        loop += 1
         if query is None:
             logger.warning("The next query is empty!")
 
