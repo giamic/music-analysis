@@ -2,11 +2,14 @@ import os
 
 # PATH
 DATA_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', '..', 'data')
-EXTERNAL_DATA_FOLDER = os.path.join(os.path.abspath(os.sep), 'media', 'giamic', 'Local Disk', 'Pycharm Projects',
-                                    'music_analysis', 'data', 'spotify_previews')
+COMPOSERS_DATA = os.path.join(DATA_FOLDER, 'composers.csv')
 TRAIN_PATH = os.path.join(DATA_FOLDER, 'train.tfrecords')
 VALIDATION_PATH = os.path.join(DATA_FOLDER, 'validation.tfrecords')
-MODELS_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', '..', 'models')
+# MODELS_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', '..', 'models')
+
+STORAGE_FOLDER = os.path.join(os.path.abspath(os.sep), 'media', 'giamic', 'Local Disk', 'Pycharm Projects', 'music_analysis')
+EXTERNAL_DATA_FOLDER = os.path.join(STORAGE_FOLDER, 'data', 'spotify_previews')
+MODELS_FOLDER = os.path.join(STORAGE_FOLDER, 'models')
 
 # AUDIO PREPROCESSING
 SR = 44100  # the sampling rate

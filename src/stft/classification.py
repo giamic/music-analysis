@@ -122,7 +122,7 @@ with tf.Session() as sess:
         if (n % PARAMS['test_step'] == 0) or n == PARAMS['steps'] - 1:
             print("step {} of {}, global_step set to {}. Test time!".format(n, PARAMS['steps'] - 1, global_step))
             acc_validation, lss_validation = 0., 0.
-            ems, c_ids, r_ids, s_ids, times = [], [], [], [], []
+            ems, c_ids, s_ids = [], [], []
             y_real, y_pred = [], []
             for i in range(PARAMS['steps_validation']):
                 summary, em, cs, ss, acc, lss, yrs, yps = sess.run(
@@ -154,7 +154,8 @@ with tf.Session() as sess:
             with open(os.path.join(output_folder, "cm.txt"), 'w') as f:
                 for item in cm:
                     f.write("%s\n" % item)
-            # tree_analysis(dm, c_ids, r_ids, s_ids, times, output_folder)
+            logger.warning("Doing the tree analysis")
+            tree_analysis(dm, c_ids, s_ids, output_folder, run_analysis=False)
             saver.save(sess, os.path.join(model_folder, "model.ckpt"))
 
         elif n > 0 and PARAMS['profile_step'] > 0 and n % PARAMS['profile_step'] == 0:  # train and log
