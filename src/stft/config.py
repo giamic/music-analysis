@@ -1,3 +1,4 @@
+import math
 import os
 
 # PATH
@@ -26,7 +27,6 @@ PARAMS = {
     'sb_test': None,  # shuffle_buffer
     'sb_train': 1000,
     'x.shape': [-1, 233, 1323, 1],
-    'loss_margin': 10,
     'lr': 0.001,  # learning rate
     'f1': 8,  # number of filters in the 1st layer
     'f2': 8,
@@ -40,7 +40,7 @@ PARAMS = {
     'k3_t': 16,
     'k4_f': 8,
     'k4_t': 16,
-    'n_embeddings': 24,  # number of elements in the final embeddings vector
+    'n_embeddings': 48,  # number of elements in the final embeddings vector
     'n_composers': 13,  # number of composers in the classification task
     'epochs': 200,
     'log_step': 10,
@@ -53,3 +53,4 @@ PARAMS['steps_validation'] = int(PARAMS['n_validation_examples'] / PARAMS['bs_te
 PARAMS['steps_train'] = int(PARAMS['n_train_examples'] / PARAMS['bs_train'])
 PARAMS['steps'] = (PARAMS['steps_train'] + 1) * PARAMS['epochs']
 PARAMS['test_step'] = PARAMS['steps_train'] + 1
+PARAMS['triplet_loss_margin'] = math.sqrt(PARAMS['n_embeddings']) / 2
