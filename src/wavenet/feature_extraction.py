@@ -14,13 +14,13 @@ import tensorflow as tf
 from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 
-from stft.models import extract_3c2_rnn_bn_pool_sigmoid
-from stft.classify_runs import logged_run, training_run, profiled_run
-from stft.config import TRAIN_PATH, VALIDATION_PATH, MODELS_FOLDER, PARAMS
-from stft.data_loading import create_tfrecords_iterator
 from tree import tree_analysis
-from stft.utils import pairwise_distances_array
 from triplet_loss import pairwise_distances, batch_hard_triplet_loss
+from wavenet.classify_runs import logged_run, training_run, profiled_run
+from wavenet.config import TRAIN_PATH, VALIDATION_PATH, MODELS_FOLDER, PARAMS
+from wavenet.data_loading import create_tfrecords_iterator
+from wavenet.models import extract_3c2_rnn_bn_pool_sigmoid
+from wavenet.utils import pairwise_distances_array
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

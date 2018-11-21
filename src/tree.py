@@ -28,19 +28,27 @@ def _create_metadata(excerpt_ids, md_file):
     return md_file
 
 
-def _reconstruct_tree(matrix, tree, info=None):
+def _reconstruct_tree(matrix, tree, info=None, improvements=False):
     work_dir, matrix_filename = os.path.split(matrix)
     tree_filename = 'tree.nwk'
     info_filename = 'fastME.info'
 
     # Reconstruct a tree from the matrix
-    call(["docker", "run",
-          "-v", "{}:/data".format(work_dir),  # set working directory
-          "-t", "evolbioinfo/fastme:v2.1.6.1",  # choose tool to use
-          "-i", "/data/{}".format(matrix_filename),  # input
-          "-o", "/data/{}".format(tree_filename),  # output
-          "-I", "/data/{}".format(info_filename),  # log file
-          "-n", "-s"])  # tree topology improvements (NNI and SPR)
+    if improvements:
+        call(["docker", "run",
+              "-v", "{}:/data".format(work_dir),  # set working directory
+              "-t", "evolbioinfo/fastme:v2.1.6.1",  # choose tool to use
+              "-i", "/data/{}".format(matrix_filename),  # input
+              "-o", "/data/{}".format(tree_filename),  # output
+              "-I", "/data/{}".format(info_filename),  # log file
+              "-n", "-s"])  # tree topology improvements (NNI and SPR)
+    else:
+        call(["docker", "run",
+              "-v", "{}:/data".format(work_dir),  # set working directory
+              "-t", "evolbioinfo/fastme:v2.1.6.1",  # choose tool to use
+              "-i", "/data/{}".format(matrix_filename),  # input
+              "-o", "/data/{}".format(tree_filename),  # output
+              "-I", "/data/{}".format(info_filename)])  # log file
     call(['mv', '{}/{}'.format(work_dir, tree_filename), tree])
     if info:
         call(['mv', '{}/{}'.format(work_dir, info_filename), info])
@@ -117,8 +125,8 @@ def _create_itol_annotations(metadata_file):
 
 
 if __name__ == '__main__':
-    output_folder = os.path.join(MODELS_FOLDER, 'classify_3c2_rnn_bn_pool_sigmoid_2018-11-15_21-39-04', 'test',
-                                 '2018-11-16_02-25-31')
+    output_folder = os.path.join(MODELS_FOLDER, 'extract_3c2_rnn_bn_pool_sigmoid_2018-11-19_17-40-15', 'test',
+                                 '2018-11-19_18-43-44')
     matrix_file = os.path.join(output_folder, 'matrix.phy')
     metadata_file = os.path.join(output_folder, 'metadata.tab')
     tree_file = os.path.join(output_folder, 'tree.nwk')

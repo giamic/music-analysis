@@ -15,13 +15,13 @@ from sklearn.metrics import confusion_matrix
 from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 
-from models import classify_3c2_rnn_bn_pool_sigmoid
+from stft.models import classify_3c2_rnn_bn_pool_sigmoid
 from stft.classify_runs import logged_run, training_run, profiled_run
 from stft.config import TRAIN_PATH, VALIDATION_PATH, MODELS_FOLDER, PARAMS
 from stft.data_loading import create_tfrecords_iterator
-from stft.tree import tree_analysis
+from tree import tree_analysis
 from stft.utils import pairwise_distances_array
-from triplet_loss import pairwise_distances, batch_hard_triplet_loss
+from triplet_loss import pairwise_distances
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

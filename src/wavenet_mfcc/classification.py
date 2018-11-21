@@ -1,31 +1,33 @@
 """
 IDEA FOR THE ALGORITHM:
-  - CNN on the magnitude of the STFT
-  - apply triplet loss (thanks to the amazing guy that posted it on github)
+  - dilated convolution on the raw audio
+  - apply multi-class classification loss
   - train
 """
 
 import logging
 import os
+import sys
 from datetime import datetime
 
 import numpy as np
 import tensorflow as tf
+from sklearn.metrics import confusion_matrix
 from tensorflow.python.profiler import option_builder
 from tensorflow.python.profiler.model_analyzer import Profiler
 
-from stft.models import extract_3c2_rnn_bn_pool_sigmoid
-from stft.classify_runs import logged_run, training_run, profiled_run
-from stft.config import TRAIN_PATH, VALIDATION_PATH, MODELS_FOLDER, PARAMS
-from stft.data_loading import create_tfrecords_iterator
 from tree import tree_analysis
-from stft.utils import pairwise_distances_array
-from triplet_loss import pairwise_distances, batch_hard_triplet_loss
+from triplet_loss import pairwise_distances
+from wavenet_mfcc.classify_runs import logged_run, training_run, profiled_run
+from wavenet_mfcc.config import TRAIN_PATH, VALIDATION_PATH, MODELS_FOLDER, PARAMS
+from wavenet_mfcc.data_loading import create_tfrecords_iterator
+from wavenet_mfcc.models import wavenet_s2_11l_relu_classify, wavenet_rnn_s2_7l_relu_classify, classify_3c1_rnn_bn_pool_sigmoid
+from wavenet_mfcc.utils import pairwise_distances_array
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-model = extract_3c2_rnn_bn_pool_sigmoid
+model = classify_3c1_rnn_bn_pool_sigmoid
 model_folder = os.path.join(MODELS_FOLDER, model.__name__ + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
 
 try:
@@ -47,21 +49,34 @@ with tf.name_scope("data_input") as scope:
     x, comp_id, song_id = tf.data.Iterator.from_string_handle(
         handle, trn_itr.output_types, trn_itr.output_shapes).get_next()
 
-    input_layer = tf.reshape(x, PARAMS['x.shape'])  # shape [-1, 233, 1_323, 1]
+    input_layer = tf.reshape(x / 100, PARAMS['x.shape'])  # shape [-1, 2048, 20]
     y_ = tf.one_hot(comp_id, PARAMS['n_composers'])
     y_ = tf.squeeze(y_, 1)  # squeeze because tf.graph doesn't know that there is only one comp_id per data point
 
 """ Calculations """
-_, embeddings = model(input_layer, PARAMS)
+logits, embeddings, out0, out1, out2, out3, out4, out5, out6, out7 = model(input_layer, PARAMS)
 distance_matrix = pairwise_distances(embeddings)
 
 with tf.name_scope("training") as scope:
-    loss = batch_hard_triplet_loss(tf.squeeze(comp_id, 1), embeddings, PARAMS['triplet_loss_margin'])
+    loss = tf.losses.softmax_cross_entropy(y_, logits)
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)  # needed for batch normalizations
     with tf.control_dependencies(update_ops):
-        train_step = tf.train.AdamOptimizer(PARAMS['lr']).minimize(loss, global_step=tf.train.create_global_step())
+        # train_step = tf.train.AdamOptimizer(PARAMS['lr']).minimize(loss, global_step=tf.train.create_global_step())
+        optimizer = tf.train.AdamOptimizer(learning_rate=PARAMS['lr'])
+        gvs = optimizer.compute_gradients(loss)
+        grads = [x[0] for x in gvs]  # the gradients
+        vars = [x[1] for x in gvs]  # the value of the associated variables
+        clipped_grads, _ = tf.clip_by_global_norm(grads, 1)
+        clipped_gvs = zip(clipped_grads, vars)
+        train_step = optimizer.apply_gradients(clipped_gvs, global_step=tf.train.create_global_step())
 tf.summary.scalar('loss', loss)
 
+""" Creation of the distance matrix for the tree reconstruction """
+with tf.name_scope('summaries') as scope:
+    class_predicted = tf.argmax(logits, axis=1)
+    class_true = tf.argmax(y_, axis=1)
+    accuracy = tf.reduce_mean(tf.cast(tf.equal(class_predicted, class_true), tf.float32))
+tf.summary.scalar('accuracy', accuracy)
 
 """ Session run """
 with tf.Session() as sess:
@@ -79,17 +94,17 @@ with tf.Session() as sess:
     saver = tf.train.Saver()
     profiler = Profiler(sess.graph)
 
-    try:
-        logger.info("Trying to find a previous model checkpoint.")
-        saver.restore(sess, os.path.join(model_folder, "model.ckpt"))
-        logger.info("Previous model restored")
-    except tf.errors.NotFoundError:
-        logger.warning("No model checkpoint found. Initializing a new model.")
+    # try:
+    #     logger.info("Trying to find a previous model checkpoint.")
+    #     saver.restore(sess, os.path.join(model_folder, "model.ckpt"))
+    #     logger.info("Previous model restored")
+    # except tf.errors.NotFoundError:
+    #     logger.warning("No model checkpoint found. Initializing a new model.")
 
     trn_handle = sess.run(trn_itr.string_handle())
     tst_handle = sess.run(tst_itr.string_handle())
-    test = sess.run([x, y_, embeddings], feed_dict={handle: trn_handle})
-    print(test[2])
+    # test = sess.run([x, comp_id, y_, logits], feed_dict={handle: trn_handle})
+    # print(test[3], test[1], test[2])
 
     opts = (option_builder.ProfileOptionBuilder(option_builder.ProfileOptionBuilder.trainable_variables_parameter())
             .with_file_output(os.path.join(model_folder, 'profile_model.txt')).build())
@@ -98,27 +113,45 @@ with tf.Session() as sess:
     value_lv = None
     lv = tf.Summary()
     lv.value.add(tag='loss', simple_value=value_lv)
+    value_av = None
+    av = tf.Summary()
+    av.value.add(tag='accuracy', simple_value=value_av)
 
     # steps = 1
     for n in range(PARAMS['steps']):
         global_step = sess.run(tf.train.get_global_step())
 
         # if n == 0:  # log the results on the test set and reconstruct the tree
-        if (n % PARAMS['test_step'] == 0) or n == PARAMS['steps'] - 1:
+        if (n > 0 and n % PARAMS['test_step'] == 0) or n == PARAMS['steps'] - 1:
             print("step {} of {}, global_step set to {}. Test time!".format(n, PARAMS['steps'] - 1, global_step))
-            lss_validation = 0.
+            acc_validation, lss_validation = 0., 0.
             ems, c_ids, s_ids = [], [], []
+            y_real, y_pred = [], []
             for i in range(PARAMS['steps_validation']):
-                summary, em, cs, ss, lss = sess.run(
-                    [merged, embeddings, comp_id, song_id, loss],
+                print("validation step {} of {}".format(i, PARAMS['steps_validation'] - 1))
+                summary, il, em, lts, o0, o1, o2, o3, o4, o5, o6, o7, cs, ss, acc, lss, g, yps, yrs = sess.run(
+                    [merged, input_layer, embeddings, logits, out0, out1, out2, out3, out4, out5, out6, out7, comp_id,
+                     song_id, accuracy, loss, grads, class_predicted,
+                     class_true],
                     feed_dict={handle: tst_handle})
+                acc_validation += acc
                 lss_validation += lss
                 ems.extend(em), c_ids.extend(cs), s_ids.extend(ss)
+                y_real.extend(yrs), y_pred.extend(yps)
+                # print(acc, lss)
+                if np.isnan(lss):
+                    idx = np.where(yps == 0)
+                    print(np.any(np.isnan(il)))
 
+            acc_validation /= PARAMS['steps_validation']
             lss_validation /= PARAMS['steps_validation']
-            print(lss_validation)
+            print(acc_validation, lss_validation)
+            cm = confusion_matrix(y_real, y_pred)
+            print(cm)
 
+            av.value[0].simple_value = acc_validation
             lv.value[0].simple_value = lss_validation
+            test_writer.add_summary(av, global_step=global_step)
             test_writer.add_summary(lv, global_step=global_step)
 
             ems = np.array(ems)
@@ -128,6 +161,9 @@ with tf.Session() as sess:
                 os.mkdir(output_folder)
             except FileExistsError:
                 pass
+            with open(os.path.join(output_folder, "cm.txt"), 'w') as f:
+                for item in cm:
+                    f.write("%s\n" % item)
             logger.warning("Doing the tree analysis")
             tree_analysis(dm, c_ids, s_ids, output_folder, run_analysis=False)
             saver.save(sess, os.path.join(model_folder, "model.ckpt"))
@@ -138,9 +174,13 @@ with tf.Session() as sess:
                          train_writer)
         elif n % PARAMS['log_step'] == 0:  # train and log
             print("step {} of {}, global_step set to {}".format(n, PARAMS['steps'] - 1, global_step))
-            logged_run(sess, [train_step], merged, handle, trn_handle, global_step, train_writer)
+            summary, _ = sess.run([merged, train_step], feed_dict={handle: trn_handle})
+            train_writer.add_summary(summary, global_step=global_step)
         else:  # just train
-            training_run(sess, [train_step], handle, trn_handle)
+            _, il, em, lts, o0, o1, o2, o3, o4, o5, o6, o7, cs, ss, acc, lss, g, cg, gradvars, yps, yrs = sess.run(
+                [train_step, input_layer, embeddings, logits, out0, out1, out2, out3, out4, out5, out6, out7, comp_id,
+                 song_id, accuracy, loss, grads, clipped_grads, gvs, class_predicted, class_true], feed_dict={handle: trn_handle})
+            print(lss)
     # Profiler advice
     ALL_ADVICE = {'ExpensiveOperationChecker': {},
                   'AcceleratorUtilizationChecker': {},
