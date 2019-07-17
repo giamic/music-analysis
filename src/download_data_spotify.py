@@ -1,3 +1,13 @@
+"""
+Prior to running this script, you need to have a file spotify_credentials.csv into your data folder.
+It must be a file with two lines:
+Client ID, *ID here*
+Client Secret, *secret here*
+
+They can be obtained from the Spotify dashboard (https://developer.spotify.com/dashboard/applications)
+after having registered your application.
+"""
+
 import csv
 import json
 import logging
