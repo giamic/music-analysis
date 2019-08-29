@@ -7,7 +7,8 @@ from matplotlib import cm
 from matplotlib.image import imsave
 from scipy.signal import spectrogram, stft
 
-from stft.config import SR, FRAME_SIZE, N_FFT, FREQUENCY_CAP, EXTERNAL_DATA_FOLDER
+from config_general import SPOTIFY_FOLDER
+from stft.config import SR, FRAME_SIZE, N_FFT, FREQUENCY_CAP
 
 np.random.seed(18)
 
@@ -37,6 +38,16 @@ def cap_frequency(f, t, v):
     return f[:f_end], t, v[:f_end]
 
 
+def _check_files_already_analysed(images_folder):
+    files = os.listdir(images_folder)
+    if len(files) == 0:
+        return -1, -1
+    last_file = sorted(files)[-1]
+    last_file = last_file.split("_")
+    artist, track = last_file[1], last_file[2]
+    return artist, track
+
+
 def analyse_data(recordings_folder, images_folder):
     """
     :param recordings_folder:
@@ -44,11 +55,18 @@ def analyse_data(recordings_folder, images_folder):
     :return:
     """
     artists = sorted(os.listdir(recordings_folder))
+    last_artist, last_track = _check_files_already_analysed(images_folder)
     for artist in artists:
         tracks = sorted(os.listdir(os.path.join(recordings_folder, artist)))
-        print("Working on {}, total of {} tracks".format(artist, len(tracks)))
+        print(f"Working on {artist}, total of {len(tracks)} tracks")
+        artist_id = artist.split("_")[0]
+        if artist_id < last_artist:
+            print(f"The data for {artist} has already been analysed. Skipping")
+            continue
+        if artist_id == last_artist:
+            tracks = tracks[int(last_track):]
+            print(f"Some of the data for {artist} has already been analysed. Skipping first {last_track} tracks.")
         for track in tracks:
-            artist_id = artist.split("_")[0]
             track_name = ''.join(track.split(".")[:-1])
             track_id = track.split("_")[0]
             if random.randint(0, 99) == 0:
@@ -56,10 +74,13 @@ def analyse_data(recordings_folder, images_folder):
             audio_file = os.path.join(recordings_folder, artist, track)
             f, t, v = analyse_single_file(audio_file)
             f, t, v = cap_frequency(f, t, v)
-            output_file = os.path.join(images_folder, 'CRS_{}_{}.png'.format(artist_id, track_name))
+            # The maximum length of the file name path accepted by Ubuntu 19.04 is 255
+            output_file = os.path.join(images_folder, 'CRS_{}_{}'.format(artist_id, track_name))[:251] + ".png"
             imsave(output_file, v, cmap=cm.get_cmap("Greys_r"), origin='lower')
     return
 
 
 if __name__ == '__main__':
-    analyse_data(os.path.join(EXTERNAL_DATA_FOLDER, 'recordings'), os.path.join(EXTERNAL_DATA_FOLDER, 'images'))
+    images_folder = os.path.join(SPOTIFY_FOLDER, 'images')
+    os.makedirs(images_folder, exist_ok=True)
+    analyse_data(os.path.join(SPOTIFY_FOLDER, 'recordings'), images_folder)

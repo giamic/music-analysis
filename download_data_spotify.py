@@ -18,10 +18,12 @@ from oauthlib.oauth2 import BackendApplicationClient
 from requests.auth import HTTPBasicAuth
 from requests_oauthlib import OAuth2Session
 
+from config_general import SPOTIFY_FOLDER, C2ID
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-CREDENTIALS_FILE = os.path.join('..', 'data', 'spotify_credentials.csv')
+CREDENTIALS_FILE = os.path.join('.', 'data', 'spotify_credentials.csv')
 with open(CREDENTIALS_FILE) as f:
     csvfile = csv.reader(f)
     _, client_id = next(csvfile)
@@ -76,40 +78,20 @@ def download_files(query, folder, counter):
 
 n_loops = 1000
 n_previews = 3000
-c2id = {
-    'Johann Sebastian Bach': '5aIqB5nVVvmFsvSdExz408',
-    'Ludwig van Beethoven': '2wOqMjp9TyABvtHdOSOTUS',
-    'Frederic Chopin': '7y97mc3bZRFXzT2szRM4L4',
-    'Gabriel Faure': '2gClsBep1tt1rv1CN210SO',
-    'Robert Schumann': '2UqjDAXnDxejEyE0CzfUrZ',
-    'Franz Schubert': '2p0UyoPfYfI76PCStuXfOP',
-    'Wolfgang Amadeus Mozart': '4NJhFmfw43RLBLjQvxDuRS',
-    'Franz Liszt': '1385hLNbrnbCJGokfH2ac2',
-    'Claude Debussy': '1Uff91EOsvd99rtAupatMP',
-    'Maurice Ravel': '17hR0sYHpx7VYTMRfFUOmY',
-    'Domenico Scarlatti': '0mFblCBw0GcoY7zY1P8tzE',
-    'Dmitri Shostakovich': '6s1pCNXcbdtQJlsnM1hRIA',
-    'Sergei Prokofiev': '4kHtgiRnpmFIV5Tm4BIs8l',
-    'Sergei Rachmaninov': '0Kekt6CKSo0m5mivKcoH51'
-}
 
-composers = ['Claude Debussy']
-# composers = sorted(c2id.keys())
-output_folders = [
-    os.path.join(os.path.abspath(os.sep), 'media', 'giamic', 'Local Disk', 'music_analysis', 'data', 'spotify_previews',
-                 'recordings', str(i).zfill(3) + '_' + c) for i, c in enumerate(composers)]
+# composers = ['Claude Debussy']
+offset = 13
+composers = sorted(C2ID.keys())[offset:]
+output_folders = [os.path.join(SPOTIFY_FOLDER, 'recordings', str(i + offset).zfill(3) + '_' + c) for i, c in enumerate(composers)]
 for of in output_folders:
-    try:
-        os.makedirs(of)
-    except FileExistsError:
-        pass
+    os.makedirs(of, exist_ok=True)
 
 for c, of in zip(composers, output_folders):
     logger.info("Working on {}".format(c))
     logger.info("Output folder is {}".format(of))
     counter = 0
 
-    query = 'https://api.spotify.com/v1/artists/{}/albums'.format(c2id[c])
+    query = 'https://api.spotify.com/v1/artists/{}/albums'.format(C2ID[c])
     while query is not None and counter < n_previews:
         logger.info("Asking query {}, so far {} elements processed".format(query, counter))
         query, counter = download_files(query, of, counter)

@@ -6,7 +6,7 @@ import tensorflow as tf
 from skimage.color import rgb2gray, rgba2rgb
 from skimage.io import imread
 
-from stft.config import TRAIN_PATH, VALIDATION_PATH, EXTERNAL_DATA_FOLDER
+from stft.config import TRAIN_PATH, VALIDATION_PATH, SPOTIFY_DATA_FOLDER
 
 
 def transform_into_tfrecord(data_path, output_path):
@@ -15,7 +15,7 @@ def transform_into_tfrecord(data_path, output_path):
     file_names = os.listdir(data_path)
     random.shuffle(file_names)
     n, N = 0, len(file_names)
-    with tf.python_io.TFRecordWriter(output_path) as writer:
+    with tf.io.TFRecordWriter(output_path) as writer:
         for fn in file_names:
             if n % 100 == 0:
                 print("Image {} of {}".format(n, N))
@@ -40,6 +40,8 @@ def transform_into_tfrecord(data_path, output_path):
 def train_validation_split(data_folder):
     images = os.listdir(data_folder)
     images = [i for i in images if i[-4:] == '.png']  # remove directories and other files and keep only the images
+    os.makedirs(os.path.join(data_folder, 'validation'), exist_ok=True)
+    os.makedirs(os.path.join(data_folder, 'train'), exist_ok=True)
 
     if len(images) == 0:
         print("No data available for splitting, I'm leaving.")
@@ -55,6 +57,6 @@ def train_validation_split(data_folder):
 
 
 if __name__ == '__main__':
-    # train_validation_split(EXTERNAL_DATA_FOLDER)
-    transform_into_tfrecord(os.path.join(EXTERNAL_DATA_FOLDER, 'images', 'train'), TRAIN_PATH)
-    transform_into_tfrecord(os.path.join(EXTERNAL_DATA_FOLDER, 'images', 'validation'), VALIDATION_PATH)
+    train_validation_split(os.path.join(SPOTIFY_DATA_FOLDER, 'images'))
+    transform_into_tfrecord(os.path.join(SPOTIFY_DATA_FOLDER, 'images', 'train'), TRAIN_PATH)
+    transform_into_tfrecord(os.path.join(SPOTIFY_DATA_FOLDER, 'images', 'validation'), VALIDATION_PATH)
