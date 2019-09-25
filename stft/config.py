@@ -24,7 +24,7 @@ FREQUENCY_CAP = 5000  # in Hz, throw away the part of the spectrogram above to s
 PARAMS = {
     'bs': 4,  # batch_size
     'sb': 1000,
-    'x.shape': [-1, 233, 1323, 1],
+    'x.shape': [233, 1323, 1],
     'lr': 0.001,  # learning rate
     'f1': 8,  # number of filters in the 1st layer
     'f2': 8,

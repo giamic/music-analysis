@@ -12,9 +12,9 @@ def _parse_function(proto):
         "x": tf.io.FixedLenSequenceFeature([], tf.int64, default_value=0, allow_missing=True)
     }
     parsed_features = tf.io.parse_single_example(proto, f)
-    comp_id = parsed_features["composer_id"]
+    comp_id = tf.reshape(parsed_features["composer_id"], [1])
     # song_id = parsed_features["song_id"]
-    x = tf.reshape(tf.cast(parsed_features["x"], tf.float32), PARAMS['x.shape'][1:])
+    x = tf.reshape(tf.cast(parsed_features["x"], tf.float32), PARAMS['x.shape'])
     return x, comp_id  # , song_id
 
 
