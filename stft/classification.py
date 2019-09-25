@@ -35,7 +35,7 @@ model.compile(optimizer='adam', loss='categorical_crossentropy')
 callbacks = [
     TensorBoard(log_dir=os.path.join(model_folder, 'logs')),
     EarlyStopping(patience=3),
-    TimeOut(t0=time.time(), timeout=.58),
+    TimeOut(t0=time.time(), timeout=58),
 ]
 model.fit(train_data, steps_per_epoch=PARAMS['steps_train'],
           validation_data=valid_data, validation_steps=PARAMS['steps_validation'],
