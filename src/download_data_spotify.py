@@ -1,5 +1,5 @@
 """
-Prior to running this script, you need to have a file spotify_credentials.csv into your data folder.
+Prior to running this script, you need to have a file spotify_credentials.csv into your resources folder.
 It must be a file with two lines:
 Client ID, *ID here*
 Client Secret, *secret here*
@@ -18,10 +18,12 @@ from oauthlib.oauth2 import BackendApplicationClient
 from requests.auth import HTTPBasicAuth
 from requests_oauthlib import OAuth2Session
 
+from src import RESOURCES_FOLDER
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-CREDENTIALS_FILE = os.path.join('..', 'data', 'spotify_credentials.csv')
+CREDENTIALS_FILE = os.path.join(RESOURCES_FOLDER, 'spotify_credentials.csv')
 with open(CREDENTIALS_FILE) as f:
     csvfile = csv.reader(f)
     _, client_id = next(csvfile)
